@@ -439,17 +439,15 @@ function LanguageExercise() {
   };
   const showWord = (word: string) => word ? <MathText>{word}</MathText> : <MathText>\\varepsilon</MathText>;
   return <Editor sidebarContent={<section className="language-task">
-    <div className="exercise-progress"><span>Progression</span><strong>{solved.length}/{languageExercises.length}</strong></div>
     <label htmlFor="language-exercise">Exercice</label>
     <select id="language-exercise" value={exerciseId} onChange={(event) => selectExercise(Number(event.target.value))}>
       {languageExercises.map((item) => <option key={item.id} value={item.id}>{solved.includes(item.id) ? '✓ ' : ''}{String(item.id).padStart(2, '0')} — {item.title}</option>)}
     </select>
-    <span className="difficulty-level">Difficulté {exercise.id}/10</span>
     <h2>{exercise.title}</h2>
     <p>{exercise.prompt} Alphabet : <MathText>{'\\Sigma = \\{a,b\\}'}</MathText>.</p>
     <div className="word-examples"><span><strong>Acceptés</strong>{exercise.accepted.map((word, index) => <span key={`${word}-${index}`}>{showWord(word)}</span>)}</span><span><strong>Refusés</strong>{exercise.rejected.map((word, index) => <span key={`${word}-${index}`}>{showWord(word)}</span>)}</span></div>
     {feedback && <Feedback {...feedback} />}
-    <div className="exercise-buttons"><button className="ghost-button" onClick={restart}><RotateCcw /> Recommencer</button><button className="primary" onClick={check}><Check /> Vérifier</button></div>
+    <div className="exercise-buttons"><button className="ghost-button" onClick={restart}><RotateCcw /> Recommencer</button><button className="primary" onClick={check}><Check /> Vérifier</button><button className="ghost-button next-exercise" disabled={exerciseId === languageExercises.length} onClick={() => selectExercise(exerciseId + 1)}>Exercice suivant <ArrowRight /></button></div>
   </section>} />;
 }
 
