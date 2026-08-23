@@ -216,22 +216,22 @@ function parseRegex(source: string) {
   return new RegexParser(normalized).parse();
 }
 
-function equivalentRegex(left: RegexAst, right: RegexAst) {
-  const queue: Array<[RegexAst, RegexAst]> = [[left, right]];
+function compareRegex(left: RegexAst, right: RegexAst) {
+  const queue: Array<[RegexAst, RegexAst, string]> = [[left, right, '']];
   const seen = new Set<string>();
   while (queue.length) {
-    const [a, b] = queue.shift()!;
+    const [a, b, word] = queue.shift()!;
     const pairKey = `${keyOf(a)}=${keyOf(b)}`;
     if (seen.has(pairKey)) continue;
     seen.add(pairKey);
-    if (nullable(a) !== nullable(b)) return false;
+    if (nullable(a) !== nullable(b)) return { equivalent: false, word, leftAccepts: nullable(a) };
     if (seen.size > 1000) throw new Error('Expression trop complexe pour une correction instantanée.');
-    ['a', 'b'].forEach((symbol) => queue.push([derivative(a, symbol), derivative(b, symbol)]));
+    ['a', 'b'].forEach((symbol) => queue.push([derivative(a, symbol), derivative(b, symbol), word + symbol]));
   }
-  return true;
+  return { equivalent: true };
 }
 
-function Editor() {
+function Editor({ challenge }: { challenge?: React.ReactNode }) {
   const { nodes, edges, setNodes, setEdges, reset } = useGraphStore();
   const [mode, setMode] = useState<Mode>('select');
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -308,8 +308,17 @@ function Editor() {
     setPanel('test');
   };
 
+  const resetDrawing = () => {
+    reset(true);
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+    setEdgeSource(null);
+    setMode('select');
+  };
+
   return (
-    <section className="workspace">
+    <section className={`workspace ${challenge ? 'has-challenge' : ''}`}>
+      {challenge && <div className="challenge-bar">{challenge}</div>}
       <aside className="tool-panel">
         <div className="eyebrow">Construction</div>
         <h1>Dessiner un automate</h1>
@@ -322,6 +331,7 @@ function Editor() {
         <label className="field-label" htmlFor="alphabet">Alphabet</label>
         <input className="text-input mono" id="alphabet" value={alphabet} onChange={(event) => setAlphabet(event.target.value)} />
         <div className="tip-box"><Sparkles /><span>{mode === 'edge' && edgeSource ? 'Choisissez l’état d’arrivée — le même état créera une boucle.' : 'Sélectionnez une transition pour modifier sa lettre.'}</span></div>
+        <button className="reset-button" onClick={resetDrawing}><RotateCcw /><span>Réinitialiser le dessin</span></button>
       </aside>
 
       <section className={`canvas-wrap ${mode !== 'select' ? 'is-creating' : ''}`} aria-label="Plan de travail de l’automate">
@@ -378,7 +388,7 @@ function Editor() {
         <div className="export-card"><span className="eyebrow">Exporter</span><h2>Prêt pour votre copie</h2><p>Code TikZ compatible avec la bibliothèque <code>automata</code>.</p><div className="export-actions"><button className="primary" onClick={copyLatex}><Clipboard /> Copier le LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger le fichier LaTeX"><Download /></button></div></div>
       </aside>
 
-      <div className="statusbar"><span>{nodes.length} état{nodes.length > 1 ? 's' : ''}</span><span>{edges.length} transition{edges.length > 1 ? 's' : ''}</span><span className={deterministic ? 'status-ok' : ''}>{deterministic ? 'Déterministe' : 'Non déterministe'}</span><button onClick={() => reset(true)}><RotateCcw /> Effacer</button></div>
+      <div className="statusbar"><span>{nodes.length} état{nodes.length > 1 ? 's' : ''}</span><span>{edges.length} transition{edges.length > 1 ? 's' : ''}</span><span className={deterministic ? 'status-ok' : ''}>{deterministic ? 'Déterministe' : 'Non déterministe'}</span></div>
     </section>
   );
 }
@@ -387,23 +397,22 @@ function Tool({ active, icon, label, onClick }: { active: boolean; icon: React.R
   return <button className={`tool ${active ? 'active' : ''}`} onClick={onClick}><span className="tool-icon">{icon}</span>{label}</button>;
 }
 
-function LanguageExercise({ onOpenEditor }: { onOpenEditor: () => void }) {
+function LanguageExercise() {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
-  const start = () => {
+  const restart = () => {
     setNodes([{ id: 'q0', type: 'state', position: { x: 180, y: 200 }, data: { label: 'q₀', initial: true } }]);
     setEdges([]);
     setFeedback(null);
-    onOpenEditor();
   };
   const check = () => {
     const mismatch = words(['a', 'b'], 5).find((word) => accepts(nodes, edges, word) !== word.endsWith('a'));
     setFeedback(mismatch === undefined ? { ok: true, text: 'Correct sur tous les mots de longueur ≤ 5. La structure attendue est bien présente.' } : { ok: false, text: `À revoir : le mot ${mismatch || 'ε'} devrait être ${mismatch.endsWith('a') ? 'accepté' : 'refusé'}.` });
   };
-  return <ExerciseLayout title="Construire un automate à partir d’un langage." progress="Langage → automate">
-    <article className="prompt-card"><span className="number">01</span><span className="difficulty">Essentiel</span><h2>Mots se terminant par a</h2><p>Dessinez un automate déterministe sur Σ = {'{a, b}'} qui reconnaît les mots <strong>se terminant par a</strong>.</p><div className="examples"><span>Acceptés <code>a</code> <code>ba</code> <code>abba</code></span><span>Refusés <code>ε</code> <code>b</code> <code>aab</code></span></div><button className="primary wide" onClick={start}>Dessiner la solution <ArrowRight /></button></article>
-    <article className="answer-card"><span className="eyebrow">Votre construction actuelle</span><div className="mini-stats"><span><strong>{nodes.length}</strong> états</span><span><strong>{edges.length}</strong> transitions</span></div><p>La vérification compare le langage obtenu sur tous les mots de longueur au plus 5.</p><button className="outline-button" onClick={check}><Check /> Vérifier l’automate</button>{feedback && <Feedback {...feedback} />}</article>
-  </ExerciseLayout>;
+  return <Editor challenge={<>
+    <div className="challenge-copy"><span className="eyebrow">Exercice · Langage → automate</span><strong>Mots sur Σ = {'{a, b}'} se terminant par a</strong><span>Acceptés : <code>a</code>, <code>ba</code>, <code>abba</code> · Refusés : <code>ε</code>, <code>b</code>, <code>aab</code></span></div>
+    <div className="challenge-actions">{feedback && <Feedback {...feedback} />}<button className="ghost-button" onClick={restart}><RotateCcw /> Recommencer</button><button className="primary" onClick={check}><Check /> Vérifier l’automate</button></div>
+  </>} />;
 }
 
 function RegexExercise() {
@@ -411,8 +420,11 @@ function RegexExercise() {
   const [regex, setRegex] = useState('');
   const check = () => {
     try {
-      const ok = equivalentRegex(parseRegex(regex), parseRegex('ab'));
-      setFeedback(ok ? { ok: true, text: 'Exact : cette expression reconnaît le même langage, même si sa forme est différente.' } : { ok: false, text: 'Cette expression ne reconnaît pas exactement le même langage que l’automate.' });
+      const result = compareRegex(parseRegex(regex), parseRegex('ab'));
+      const word = result.equivalent ? '' : result.word || 'ε';
+      setFeedback(result.equivalent
+        ? { ok: true, text: 'Correct.' }
+        : { ok: false, text: `Contre-exemple : « ${word} » est ${result.leftAccepts ? 'accepté par votre expression, mais refusé par l’automate' : 'refusé par votre expression, mais accepté par l’automate'}.` });
     } catch (error) {
       setFeedback({ ok: false, text: error instanceof Error ? error.message : 'Expression non reconnue.' });
     }
@@ -456,7 +468,7 @@ export default function AutomataApp() {
           <a className="help-link" href="https://fr.wikipedia.org/wiki/Automate_fini" target="_blank" rel="noreferrer"><HelpCircle /><span>Aide</span></a>
         </header>
         {section === 'draw' && <Editor />}
-        {section === 'language' && <LanguageExercise onOpenEditor={() => setSection('draw')} />}
+        {section === 'language' && <LanguageExercise />}
         {section === 'regex' && <RegexExercise />}
         {section === 'methods' && <Methods />}
       </main>
