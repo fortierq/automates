@@ -1,0 +1,8 @@
+node_modules
+.next
+.vinext
+.wrangler
+dist
+.git
+work
+outputs
