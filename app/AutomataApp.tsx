@@ -29,17 +29,28 @@ import {
   Check,
   Clipboard,
   Download,
+  Menu,
   MousePointer2,
   RotateCcw,
   Trash2,
   X,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type StateData, type StateNode, useGraphStore } from './automataStore';
 
 type Section = 'draw' | 'language' | 'regex' | 'methods';
 type EdgeRouteData = {
   routeOffset?: number;
+};
+type LanguageExerciseDefinition = {
+  id: number;
+  title: string;
+  prompt: string;
+  accepted: string[];
+  rejected: string[];
+  initial: string;
+  isFinal: (state: string) => boolean;
+  transition: (state: string, symbol: string) => string;
 };
 
 function MathText({ children }: { children: string }) {
@@ -102,20 +113,33 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
 const nodeTypes = { state: State };
 const edgeTypes = { automaton: AutomatonEdge };
 
-function compareWithWordsEndingInA(nodes: StateNode[], edges: Edge[]) {
+const languageExercises: LanguageExerciseDefinition[] = [
+  { id: 1, title: 'Le mot vide uniquement', prompt: 'Reconnaître uniquement le mot vide.', accepted: [''], rejected: ['a', 'b', 'ab'], initial: 'start', isFinal: (state) => state === 'start', transition: () => 'dead' },
+  { id: 2, title: 'Le mot a uniquement', prompt: 'Reconnaître uniquement le mot a.', accepted: ['a'], rejected: ['', 'b', 'aa'], initial: 'start', isFinal: (state) => state === 'a', transition: (state, symbol) => state === 'start' && symbol === 'a' ? 'a' : 'dead' },
+  { id: 3, title: 'Se terminer par a', prompt: 'Reconnaître les mots qui se terminent par a.', accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no', isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no' },
+  { id: 4, title: 'Commencer par b', prompt: 'Reconnaître les mots qui commencent par b.', accepted: ['b', 'ba', 'bbaa'], rejected: ['', 'a', 'ab'], initial: 'start', isFinal: (state) => state === 'yes', transition: (state, symbol) => state === 'start' ? (symbol === 'b' ? 'yes' : 'no') : state },
+  { id: 5, title: 'Contenir ab', prompt: 'Reconnaître les mots qui contiennent le facteur ab.', accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], initial: '0', isFinal: (state) => state === '2', transition: (state, symbol) => state === '2' ? '2' : state === '1' && symbol === 'b' ? '2' : symbol === 'a' ? '1' : '0' },
+  { id: 6, title: 'Un nombre pair de a', prompt: 'Reconnaître les mots contenant un nombre pair de lettres a.', accepted: ['', 'bb', 'aa', 'abba'], rejected: ['a', 'ba', 'aaa'], initial: 'even', isFinal: (state) => state === 'even', transition: (state, symbol) => symbol === 'a' ? (state === 'even' ? 'odd' : 'even') : state },
+  { id: 7, title: 'Aucun facteur bb', prompt: 'Reconnaître les mots qui ne contiennent jamais deux b consécutifs.', accepted: ['', 'a', 'bab', 'ababa'], rejected: ['bb', 'abb', 'bba'], initial: 'ok', isFinal: (state) => state !== 'dead', transition: (state, symbol) => state === 'dead' ? 'dead' : symbol === 'a' ? 'ok' : state === 'b' ? 'dead' : 'b' },
+  { id: 8, title: 'Exactement deux a', prompt: 'Reconnaître les mots contenant exactement deux lettres a.', accepted: ['aa', 'aba', 'bbaab'], rejected: ['', 'a', 'aaa'], initial: '0', isFinal: (state) => state === '2', transition: (state, symbol) => symbol === 'b' ? state : String(Math.min(3, Number(state) + 1)) },
+  { id: 9, title: 'Parités combinées', prompt: 'Reconnaître les mots ayant un nombre pair de a et un nombre impair de b.', accepted: ['b', 'aab', 'baabb'], rejected: ['', 'a', 'bb', 'ab'], initial: '00', isFinal: (state) => state === '01', transition: (state, symbol) => symbol === 'a' ? `${1 - Number(state[0])}${state[1]}` : `${state[0]}${1 - Number(state[1])}` },
+  { id: 10, title: 'Contenir aba et bab', prompt: 'Reconnaître les mots qui contiennent à la fois les facteurs aba et bab.', accepted: ['abab', 'baba', 'aababb'], rejected: ['', 'aba', 'bab', 'abba'], initial: '0|', isFinal: (state) => state.startsWith('3|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; } },
+];
+
+function compareLanguage(nodes: StateNode[], edges: Edge[], exercise: LanguageExerciseDefinition) {
   const alphabet = ['a', 'b'];
   const initialStates = nodes.filter((node) => node.data.initial).map((node) => node.id).sort();
-  const queue = [{ states: initialStates, targetAccepts: false, word: '' }];
+  const queue = [{ states: initialStates, targetState: exercise.initial, word: '' }];
   const visited = new Set<string>();
 
   for (let cursor = 0; cursor < queue.length; cursor += 1) {
     const current = queue[cursor];
-    const key = `${current.states.join(',')}|${current.targetAccepts}`;
+    const key = `${current.states.join(',')}|${current.targetState}`;
     if (visited.has(key)) continue;
     visited.add(key);
 
     const studentAccepts = nodes.some((node) => node.data.final && current.states.includes(node.id));
-    if (studentAccepts !== current.targetAccepts) {
+    if (studentAccepts !== exercise.isFinal(current.targetState)) {
       return { equivalent: false as const, word: current.word, studentAccepts };
     }
 
@@ -124,7 +148,7 @@ function compareWithWordsEndingInA(nodes: StateNode[], edges: Edge[]) {
       const states = [...new Set(edges
         .filter((edge) => sources.has(edge.source) && String(edge.label ?? '').split(',').map((item) => item.trim()).includes(symbol))
         .map((edge) => edge.target))].sort();
-      queue.push({ states, targetAccepts: symbol === 'a', word: current.word + symbol });
+      queue.push({ states, targetState: exercise.transition(current.targetState, symbol), word: current.word + symbol });
     }
   }
 
@@ -254,10 +278,11 @@ function compareRegex(left: RegexAst, right: RegexAst) {
   return { equivalent: true };
 }
 
-function Editor({ challenge }: { challenge?: React.ReactNode }) {
+function Editor({ sidebarContent }: { sidebarContent?: React.ReactNode }) {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notice, setNotice] = useState('Enregistré localement');
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
 
@@ -311,9 +336,9 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
   };
 
   return (
-    <section className={`workspace ${challenge ? 'has-challenge' : ''}`}>
-      {challenge && <div className="challenge-bar">{challenge}</div>}
+    <section className="workspace">
       <section className="canvas-wrap" aria-label="Plan de travail de l’automate">
+        <button className="sidebar-toggle" aria-controls="editor-sidebar" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Menu /><span>Ouvrir le panneau</span></button>
         <div className="canvas-status"><span>{notice}</span></div>
         <ReactFlow<StateNode, Edge>
           nodes={nodes.map((node) => ({ ...node, selected: node.id === selectedNodeId }))}
@@ -336,8 +361,12 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
         </ReactFlow>
       </section>
 
-      <aside className="side-panel">
-        {selectedNode ? (
+      <button className={`sidebar-backdrop ${sidebarOpen ? 'is-visible' : ''}`} aria-label="Fermer le panneau" onClick={() => setSidebarOpen(false)} />
+      <aside id="editor-sidebar" className={`side-panel ${sidebarOpen ? 'is-open' : ''}`}>
+        <button className="sidebar-close" aria-label="Fermer le panneau" onClick={() => setSidebarOpen(false)}><X /></button>
+        {sidebarContent}
+        <div className={sidebarContent ? 'sidebar-properties' : ''}>
+          {selectedNode ? (
             <div className="properties-form">
               <span className="eyebrow">État sélectionné</span>
               <label htmlFor="state-label">Nom</label>
@@ -355,6 +384,7 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
               <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
             </div>
           ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état, puis reliez ses poignées pour créer une transition.</p></div>}
+        </div>
         <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier le LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger le fichier LaTeX"><Download /></button></div>
       </aside>
 
@@ -364,28 +394,63 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
 
 function LanguageExercise() {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
+  const [exerciseId, setExerciseId] = useState(1);
+  const [solved, setSolved] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const exercise = languageExercises[exerciseId - 1];
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem('automates-mpi-language-solved') ?? '[]');
+        if (Array.isArray(saved)) setSolved([...new Set(saved.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= languageExercises.length))]);
+      } catch { /* Une progression invalide est simplement ignorée. */ }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   const restart = () => {
     setNodes([{ id: 'q0', type: 'state', position: { x: 180, y: 200 }, data: { label: 'q₀', initial: true } }]);
     setEdges([]);
     setFeedback(null);
   };
+
+  const selectExercise = (id: number) => {
+    setExerciseId(id);
+    restart();
+  };
+
   const check = () => {
-    const result = compareWithWordsEndingInA(nodes, edges);
+    const result = compareLanguage(nodes, edges, exercise);
     if (result.equivalent) {
       setFeedback({ ok: true, text: 'Correct : les deux langages sont égaux.' });
+      if (!solved.includes(exercise.id)) {
+        const next = [...solved, exercise.id].sort((a, b) => a - b);
+        setSolved(next);
+        localStorage.setItem('automates-mpi-language-solved', JSON.stringify(next));
+      }
       return;
     }
     const word = result.word || 'ε';
     setFeedback({
       ok: false,
-      text: `Contre-exemple : « ${word} » est ${result.studentAccepts ? 'accepté par votre automate, mais ne se termine pas par a' : 'refusé par votre automate, alors qu’il se termine par a'}.`,
+      text: `Contre-exemple : « ${word} » est ${result.studentAccepts ? 'accepté par votre automate, mais pas par le langage demandé' : 'refusé par votre automate, mais appartient au langage demandé'}.`,
     });
   };
-  return <Editor challenge={<>
-    <div className="challenge-copy"><strong>Mots sur <MathText>{'\\Sigma = \\{a,b\\}'}</MathText> se terminant par <MathText>a</MathText></strong><span>Acceptés : <MathText>a</MathText>, <MathText>ba</MathText>, <MathText>abba</MathText> · Refusés : <MathText>\\varepsilon</MathText>, <MathText>b</MathText>, <MathText>aab</MathText></span></div>
-    <div className="challenge-actions">{feedback && <Feedback {...feedback} />}<button className="ghost-button" onClick={restart}><RotateCcw /> Recommencer</button><button className="primary" onClick={check}><Check /> Vérifier l’automate</button></div>
-  </>} />;
+  const showWord = (word: string) => word ? <MathText>{word}</MathText> : <MathText>\\varepsilon</MathText>;
+  return <Editor sidebarContent={<section className="language-task">
+    <div className="exercise-progress"><span>Progression</span><strong>{solved.length}/{languageExercises.length}</strong></div>
+    <label htmlFor="language-exercise">Exercice</label>
+    <select id="language-exercise" value={exerciseId} onChange={(event) => selectExercise(Number(event.target.value))}>
+      {languageExercises.map((item) => <option key={item.id} value={item.id}>{solved.includes(item.id) ? '✓ ' : ''}{String(item.id).padStart(2, '0')} — {item.title}</option>)}
+    </select>
+    <span className="difficulty-level">Difficulté {exercise.id}/10</span>
+    <h2>{exercise.title}</h2>
+    <p>{exercise.prompt} Alphabet : <MathText>{'\\Sigma = \\{a,b\\}'}</MathText>.</p>
+    <div className="word-examples"><span><strong>Acceptés</strong>{exercise.accepted.map((word, index) => <span key={`${word}-${index}`}>{showWord(word)}</span>)}</span><span><strong>Refusés</strong>{exercise.rejected.map((word, index) => <span key={`${word}-${index}`}>{showWord(word)}</span>)}</span></div>
+    {feedback && <Feedback {...feedback} />}
+    <div className="exercise-buttons"><button className="ghost-button" onClick={restart}><RotateCcw /> Recommencer</button><button className="primary" onClick={check}><Check /> Vérifier</button></div>
+  </section>} />;
 }
 
 function RegexExercise() {
