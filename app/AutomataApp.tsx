@@ -38,7 +38,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type StateData, type StateNode, useGraphStore } from './automataStore';
 
-type Section = 'draw' | 'language' | 'regex' | 'methods';
+type Section = 'language' | 'regex' | 'methods';
 type EdgeRouteData = {
   routeOffset?: number;
 };
@@ -490,9 +490,8 @@ function Methods() {
 }
 
 export default function AutomataApp() {
-  const [section, setSection] = useState<Section>('draw');
+  const [section, setSection] = useState<Section>('language');
   const nav = [
-    ['draw', 'Dessiner'],
     ['language', 'Langage → automate'],
     ['regex', 'Automate → expression'],
     ['methods', 'Méthodes'],
@@ -501,10 +500,9 @@ export default function AutomataApp() {
     <ReactFlowProvider>
       <main className="app-shell">
         <header className="topbar">
-          <button className="brand-button" onClick={() => setSection('draw')}><span className="brand-mark">A</span><span className="brand-copy"><strong>Automates</strong><span>MP · MPI</span></span></button>
+          <button className="brand-button" onClick={() => setSection('language')}><span className="brand-mark">A</span><span className="brand-copy"><strong>Automates</strong><span>MP · MPI</span></span></button>
           <nav aria-label="Sections principales">{nav.map(([id, label]) => <button key={id} className={`nav-item ${section === id ? 'active' : ''}`} onClick={() => setSection(id)}>{label}</button>)}</nav>
         </header>
-        {section === 'draw' && <Editor />}
         {section === 'language' && <LanguageExercise />}
         {section === 'regex' && <RegexExercise />}
         {section === 'methods' && <Methods />}
