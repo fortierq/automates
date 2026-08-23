@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  addEdge,
   applyEdgeChanges,
   applyNodeChanges,
   Background,
@@ -15,6 +14,7 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useReactFlow,
   type Connection,
   type Edge,
   type EdgeProps,
@@ -28,20 +28,22 @@ import {
   Check,
   Clipboard,
   Download,
-  HelpCircle,
   MousePointer2,
   Play,
-  Plus,
   RotateCcw,
-  Sparkles,
   Trash2,
   X,
 } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { type StateData, type StateNode, useGraphStore } from './automataStore';
 
-type Mode = 'select' | 'state' | 'edge';
 type Section = 'draw' | 'language' | 'regex' | 'methods';
+type EdgeRouteData = {
+  routeOffset?: number;
+  control?: { x: number; y: number };
+  onMove?: (point: { x: number; y: number }) => void;
+  onSelect?: () => void;
+};
 
 function State({ data, selected }: { data: StateData; selected?: boolean }) {
   return (
@@ -56,13 +58,30 @@ function State({ data, selected }: { data: StateData; selected?: boolean }) {
 
 function AutomatonEdge(props: EdgeProps<Edge>) {
   const { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, label, selected } = props;
+  const { screenToFlowPosition } = useReactFlow();
+  const data = (props.data ?? {}) as EdgeRouteData;
   const loop = source === target;
+  const offset = data.routeOffset ?? 0;
   const [regularPath, regularLabelX, regularLabelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
-  const path = loop
-    ? `M ${sourceX} ${sourceY} C ${sourceX + 62} ${sourceY - 92}, ${targetX - 62} ${targetY - 92}, ${targetX} ${targetY}`
-    : regularPath;
-  const labelX = loop ? (sourceX + targetX) / 2 : regularLabelX;
-  const labelY = loop ? Math.min(sourceY, targetY) - 67 : regularLabelY - 18;
+  let path = regularPath;
+  let labelX = regularLabelX;
+  let labelY = regularLabelY - 18;
+  if (data.control) {
+    const { x, y } = data.control;
+    path = `M ${sourceX} ${sourceY} Q ${x} ${y}, ${targetX} ${targetY}`;
+    labelX = (sourceX + 2 * x + targetX) / 4;
+    labelY = (sourceY + 2 * y + targetY) / 4 - 16;
+  } else if (loop) {
+    path = `M ${sourceX} ${sourceY} C ${sourceX + 62 + offset / 2} ${sourceY - 92 - offset}, ${targetX - 62 - offset / 2} ${targetY - 92 - offset}, ${targetX} ${targetY}`;
+    labelX = (sourceX + targetX) / 2;
+    labelY = Math.min(sourceY, targetY) - 67 - offset;
+  } else if (offset !== 0) {
+    const x = (sourceX + targetX) / 2;
+    const y = (sourceY + targetY) / 2 + offset;
+    path = `M ${sourceX} ${sourceY} Q ${x} ${y}, ${targetX} ${targetY}`;
+    labelX = x;
+    labelY = y / 2 + (sourceY + targetY) / 4 - 16;
+  }
 
   return (
     <>
@@ -74,7 +93,13 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
         style={{ stroke: selected ? '#246b49' : '#33423a', strokeWidth: selected ? 2.4 : 1.7 }}
       />
       <EdgeLabelRenderer>
-        <span className={`edge-label ${selected ? 'is-selected' : ''}`} style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)` }}>
+        <span
+          className={`edge-label draggable ${selected ? 'is-selected' : ''}`}
+          title="Glisser pour déplacer la transition"
+          style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)` }}
+          onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); data.onSelect?.(); }}
+          onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) data.onMove?.(screenToFlowPosition({ x: event.clientX, y: event.clientY })); }}
+        >
           {String(label ?? '')}
         </span>
       </EdgeLabelRenderer>
@@ -232,12 +257,9 @@ function compareRegex(left: RegexAst, right: RegexAst) {
 }
 
 function Editor({ challenge }: { challenge?: React.ReactNode }) {
-  const { nodes, edges, setNodes, setEdges, reset } = useGraphStore();
-  const [mode, setMode] = useState<Mode>('select');
+  const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [edgeSource, setEdgeSource] = useState<string | null>(null);
-  const [alphabet, setAlphabet] = useState('a, b');
   const [testWord, setTestWord] = useState('abb');
   const [testResult, setTestResult] = useState<boolean | null>(null);
   const [panel, setPanel] = useState<'properties' | 'test'>('properties');
@@ -254,22 +276,9 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
     let index = 0;
     while (used.has(`q${index}`)) index += 1;
     setNodes([...nodes, { id: `q${index}`, type: 'state', position, data: { label: `q${index}` } }]);
-    setMode('select');
   }, [nodes, setNodes]);
 
   const onNodeClick: NodeMouseHandler<StateNode> = (_, node) => {
-    if (mode === 'edge') {
-      if (!edgeSource) setEdgeSource(node.id);
-      else {
-        const id = `${edgeSource}-${node.id}-${Date.now()}`;
-        setEdges(addEdge({ id, source: edgeSource, target: node.id, label: alphabet.split(',')[0]?.trim() || 'a', type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }, edges));
-        setSelectedEdgeId(id);
-        setSelectedNodeId(null);
-        setEdgeSource(null);
-        setMode('select');
-      }
-      return;
-    }
     setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
     setPanel('properties');
@@ -277,17 +286,23 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
-  const deterministic = useMemo(() => {
-    const seen = new Set<string>();
-    if (nodes.filter((node) => node.data.initial).length !== 1) return false;
-    return edges.every((edge) => String(edge.label ?? '').split(',').every((label) => {
-      const key = `${edge.source}:${label.trim()}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }));
-  }, [edges, nodes]);
-
+  const routedEdges = useMemo(() => edges.map((edge) => {
+    const siblings = edges.filter((item) => item.source === edge.source && item.target === edge.target);
+    const index = siblings.findIndex((item) => item.id === edge.id);
+    const routeOffset = edge.source === edge.target ? index * 40 : (index - (siblings.length - 1) / 2) * 64;
+    return {
+      ...edge,
+      type: 'automaton',
+      selected: edge.id === selectedEdgeId,
+      markerEnd: { type: MarkerType.ArrowClosed, color: edge.id === selectedEdgeId ? '#246b49' : '#33423a' },
+      data: {
+        ...edge.data,
+        routeOffset,
+        onSelect: () => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); setPanel('properties'); },
+        onMove: (control: { x: number; y: number }) => setEdges(edges.map((item) => item.id === edge.id ? { ...item, data: { ...item.data, control } } : item)),
+      },
+    };
+  }), [edges, selectedEdgeId, setEdges]);
   const copyLatex = async () => {
     await navigator.clipboard.writeText(toLatex(nodes, edges));
     setNotice('LaTeX copié');
@@ -308,49 +323,26 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
     setPanel('test');
   };
 
-  const resetDrawing = () => {
-    reset(true);
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
-    setEdgeSource(null);
-    setMode('select');
-  };
-
   return (
     <section className={`workspace ${challenge ? 'has-challenge' : ''}`}>
       {challenge && <div className="challenge-bar">{challenge}</div>}
-      <aside className="tool-panel">
-        <div className="eyebrow">Construction</div>
-        <h1>Dessiner un automate</h1>
-        <p className="muted">Ajoutez des états, reliez-les, puis sélectionnez tout élément pour le modifier.</p>
-        <div className="tool-grid compact">
-          <Tool active={mode === 'select'} icon={<MousePointer2 />} label="Sélection" onClick={() => { setMode('select'); setEdgeSource(null); }} />
-          <Tool active={mode === 'state'} icon={<Plus />} label="État" onClick={() => setMode('state')} />
-          <Tool active={mode === 'edge'} icon={<ArrowRight />} label={edgeSource ? 'Cible…' : 'Transition'} onClick={() => { setMode('edge'); setEdgeSource(null); }} />
-        </div>
-        <label className="field-label" htmlFor="alphabet">Alphabet</label>
-        <input className="text-input mono" id="alphabet" value={alphabet} onChange={(event) => setAlphabet(event.target.value)} />
-        <div className="tip-box"><Sparkles /><span>{mode === 'edge' && edgeSource ? 'Choisissez l’état d’arrivée — le même état créera une boucle.' : 'Sélectionnez une transition pour modifier sa lettre.'}</span></div>
-        <button className="reset-button" onClick={resetDrawing}><RotateCcw /><span>Réinitialiser le dessin</span></button>
-      </aside>
-
-      <section className={`canvas-wrap ${mode !== 'select' ? 'is-creating' : ''}`} aria-label="Plan de travail de l’automate">
+      <section className="canvas-wrap" aria-label="Plan de travail de l’automate">
         <div className="canvas-status"><span>{notice}</span></div>
         <ReactFlow<StateNode, Edge>
           nodes={nodes.map((node) => ({ ...node, selected: node.id === selectedNodeId }))}
-          edges={edges.map((edge) => ({ ...edge, type: 'automaton', selected: edge.id === selectedEdgeId, markerEnd: { type: MarkerType.ArrowClosed, color: edge.id === selectedEdgeId ? '#246b49' : '#33423a' } }))}
+          edges={routedEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onInit={(instance) => { flow.current = instance; }}
           onNodesChange={(changes) => setNodes(applyNodeChanges(changes, nodes) as StateNode[])}
           onEdgesChange={(changes) => setEdges(applyEdgeChanges(changes, edges))}
-          onConnect={(connection: Connection) => setEdges(addEdge({ ...connection, label: alphabet.split(',')[0]?.trim() || 'a', type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }, edges))}
+          onConnect={(connection: Connection) => setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: 'a', type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }])}
           onNodeClick={onNodeClick}
-          onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); setPanel('properties'); setMode('select'); }}
-          onPaneClick={(event) => { setSelectedNodeId(null); setSelectedEdgeId(null); if (mode === 'state' || event.detail === 2) addState(event.clientX, event.clientY); }}
+          onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); setPanel('properties'); }}
+          onPaneClick={(event) => { setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
           onNodesDelete={(deleted) => { if (deleted.some((node) => node.id === selectedNodeId)) setSelectedNodeId(null); }}
           onEdgesDelete={(deleted) => { if (deleted.some((edge) => edge.id === selectedEdgeId)) setSelectedEdgeId(null); }}
-          fitView minZoom={0.3} maxZoom={2} deleteKeyCode={['Backspace', 'Delete']}
+          fitView minZoom={0.3} maxZoom={2} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cdd6ce" />
           <Controls showInteractive={false} position="top-right" />
@@ -377,7 +369,7 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
               <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
               <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
             </div>
-          ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Aucune sélection</strong><p>Sélectionnez un état ou une transition pour le modifier.</p></div>
+          ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état. Reliez ses poignées pour créer une transition, puis glissez son étiquette pour courber le tracé.</p></div>
         ) : (
           <div className="test-panel">
             <span className="eyebrow">Mot à reconnaître</span>
@@ -388,13 +380,8 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
         <div className="export-card"><span className="eyebrow">Exporter</span><h2>Prêt pour votre copie</h2><p>Code TikZ compatible avec la bibliothèque <code>automata</code>.</p><div className="export-actions"><button className="primary" onClick={copyLatex}><Clipboard /> Copier le LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger le fichier LaTeX"><Download /></button></div></div>
       </aside>
 
-      <div className="statusbar"><span>{nodes.length} état{nodes.length > 1 ? 's' : ''}</span><span>{edges.length} transition{edges.length > 1 ? 's' : ''}</span><span className={deterministic ? 'status-ok' : ''}>{deterministic ? 'Déterministe' : 'Non déterministe'}</span></div>
     </section>
   );
-}
-
-function Tool({ active, icon, label, onClick }: { active: boolean; icon: React.ReactNode; label: string; onClick: () => void }) {
-  return <button className={`tool ${active ? 'active' : ''}`} onClick={onClick}><span className="tool-icon">{icon}</span>{label}</button>;
 }
 
 function LanguageExercise() {
@@ -436,7 +423,7 @@ function RegexExercise() {
 }
 
 function ExerciseLayout({ title, progress, children }: { title: string; progress: string; children: React.ReactNode }) {
-  return <section className="exercise-page"><div className="exercise-head"><div><span className="eyebrow">Entraînement guidé</span><h1>{title}</h1><p>Une consigne courte, avec une correction immédiate et utile.</p></div><div className="progress-pill">{progress}</div></div><div className="exercise-grid">{children}</div></section>;
+  return <section className="exercise-page"><div className="exercise-head"><div><span className="eyebrow">Entraînement guidé</span><h1>{title}</h1></div><div className="progress-pill">{progress}</div></div><div className="exercise-grid">{children}</div></section>;
 }
 
 function Feedback({ ok, text }: { ok: boolean; text: string }) {
@@ -465,7 +452,6 @@ export default function AutomataApp() {
         <header className="topbar">
           <button className="brand-button" onClick={() => setSection('draw')}><span className="brand-mark">A</span><span className="brand-copy"><strong>Automates</strong><span>MP · MPI</span></span></button>
           <nav aria-label="Sections principales">{nav.map(([id, label]) => <button key={id} className={`nav-item ${section === id ? 'active' : ''}`} onClick={() => setSection(id)}>{label}</button>)}</nav>
-          <a className="help-link" href="https://fr.wikipedia.org/wiki/Automate_fini" target="_blank" rel="noreferrer"><HelpCircle /><span>Aide</span></a>
         </header>
         {section === 'draw' && <Editor />}
         {section === 'language' && <LanguageExercise />}
