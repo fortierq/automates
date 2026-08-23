@@ -14,7 +14,6 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
-  useReactFlow,
   type Connection,
   type Edge,
   type EdgeProps,
@@ -40,9 +39,6 @@ import { type StateData, type StateNode, useGraphStore } from './automataStore';
 type Section = 'draw' | 'language' | 'regex' | 'methods';
 type EdgeRouteData = {
   routeOffset?: number;
-  control?: { x: number; y: number };
-  onMove?: (point: { x: number; y: number }) => void;
-  onSelect?: () => void;
 };
 
 function State({ data, selected }: { data: StateData; selected?: boolean }) {
@@ -58,7 +54,6 @@ function State({ data, selected }: { data: StateData; selected?: boolean }) {
 
 function AutomatonEdge(props: EdgeProps<Edge>) {
   const { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, label, selected } = props;
-  const { screenToFlowPosition } = useReactFlow();
   const data = (props.data ?? {}) as EdgeRouteData;
   const loop = source === target;
   const offset = data.routeOffset ?? 0;
@@ -66,12 +61,7 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
   let path = regularPath;
   let labelX = regularLabelX;
   let labelY = regularLabelY - 18;
-  if (data.control) {
-    const { x, y } = data.control;
-    path = `M ${sourceX} ${sourceY} Q ${x} ${y}, ${targetX} ${targetY}`;
-    labelX = (sourceX + 2 * x + targetX) / 4;
-    labelY = (sourceY + 2 * y + targetY) / 4 - 16;
-  } else if (loop) {
+  if (loop) {
     path = `M ${sourceX} ${sourceY} C ${sourceX + 62 + offset / 2} ${sourceY - 92 - offset}, ${targetX - 62 - offset / 2} ${targetY - 92 - offset}, ${targetX} ${targetY}`;
     labelX = (sourceX + targetX) / 2;
     labelY = Math.min(sourceY, targetY) - 67 - offset;
@@ -94,11 +84,8 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
       />
       <EdgeLabelRenderer>
         <span
-          className={`edge-label draggable ${selected ? 'is-selected' : ''}`}
-          title="Glisser pour déplacer la transition"
+          className={`edge-label ${selected ? 'is-selected' : ''}`}
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)` }}
-          onPointerDown={(event) => { event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId); data.onSelect?.(); }}
-          onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) data.onMove?.(screenToFlowPosition({ x: event.clientX, y: event.clientY })); }}
         >
           {String(label ?? '')}
         </span>
@@ -109,16 +96,6 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
 
 const nodeTypes = { state: State };
 const edgeTypes = { automaton: AutomatonEdge };
-
-const words = (alphabet: string[], maxLength: number) => {
-  const result = [''];
-  let level = [''];
-  for (let i = 1; i <= maxLength; i += 1) {
-    level = level.flatMap((prefix) => alphabet.map((letter) => prefix + letter));
-    result.push(...level);
-  }
-  return result;
-};
 
 function accepts(nodes: StateNode[], edges: Edge[], word: string) {
   let current = new Set(nodes.filter((node) => node.data.initial).map((node) => node.id));
@@ -131,6 +108,35 @@ function accepts(nodes: StateNode[], edges: Edge[], word: string) {
     current = next;
   }
   return nodes.some((node) => node.data.final && current.has(node.id));
+}
+
+function compareWithWordsEndingInA(nodes: StateNode[], edges: Edge[]) {
+  const alphabet = ['a', 'b'];
+  const initialStates = nodes.filter((node) => node.data.initial).map((node) => node.id).sort();
+  const queue = [{ states: initialStates, targetAccepts: false, word: '' }];
+  const visited = new Set<string>();
+
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const current = queue[cursor];
+    const key = `${current.states.join(',')}|${current.targetAccepts}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    const studentAccepts = nodes.some((node) => node.data.final && current.states.includes(node.id));
+    if (studentAccepts !== current.targetAccepts) {
+      return { equivalent: false as const, word: current.word, studentAccepts };
+    }
+
+    for (const symbol of alphabet) {
+      const sources = new Set(current.states);
+      const states = [...new Set(edges
+        .filter((edge) => sources.has(edge.source) && String(edge.label ?? '').split(',').map((item) => item.trim()).includes(symbol))
+        .map((edge) => edge.target))].sort();
+      queue.push({ states, targetAccepts: symbol === 'a', word: current.word + symbol });
+    }
+  }
+
+  return { equivalent: true as const };
 }
 
 function toLatex(nodes: StateNode[], edges: Edge[]) {
@@ -298,11 +304,9 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
       data: {
         ...edge.data,
         routeOffset,
-        onSelect: () => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); setPanel('properties'); },
-        onMove: (control: { x: number; y: number }) => setEdges(edges.map((item) => item.id === edge.id ? { ...item, data: { ...item.data, control } } : item)),
       },
     };
-  }), [edges, selectedEdgeId, setEdges]);
+  }), [edges, selectedEdgeId]);
   const copyLatex = async () => {
     await navigator.clipboard.writeText(toLatex(nodes, edges));
     setNotice('LaTeX copié');
@@ -369,7 +373,7 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
               <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
               <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
             </div>
-          ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état. Reliez ses poignées pour créer une transition, puis glissez son étiquette pour courber le tracé.</p></div>
+          ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état, puis reliez ses poignées pour créer une transition.</p></div>
         ) : (
           <div className="test-panel">
             <span className="eyebrow">Mot à reconnaître</span>
@@ -393,8 +397,16 @@ function LanguageExercise() {
     setFeedback(null);
   };
   const check = () => {
-    const mismatch = words(['a', 'b'], 5).find((word) => accepts(nodes, edges, word) !== word.endsWith('a'));
-    setFeedback(mismatch === undefined ? { ok: true, text: 'Correct sur tous les mots de longueur ≤ 5. La structure attendue est bien présente.' } : { ok: false, text: `À revoir : le mot ${mismatch || 'ε'} devrait être ${mismatch.endsWith('a') ? 'accepté' : 'refusé'}.` });
+    const result = compareWithWordsEndingInA(nodes, edges);
+    if (result.equivalent) {
+      setFeedback({ ok: true, text: 'Correct : les deux langages sont égaux.' });
+      return;
+    }
+    const word = result.word || 'ε';
+    setFeedback({
+      ok: false,
+      text: `Contre-exemple : « ${word} » est ${result.studentAccepts ? 'accepté par votre automate, mais ne se termine pas par a' : 'refusé par votre automate, alors qu’il se termine par a'}.`,
+    });
   };
   return <Editor challenge={<>
     <div className="challenge-copy"><span className="eyebrow">Exercice · Langage → automate</span><strong>Mots sur Σ = {'{a, b}'} se terminant par a</strong><span>Acceptés : <code>a</code>, <code>ba</code>, <code>abba</code> · Refusés : <code>ε</code>, <code>b</code>, <code>aab</code></span></div>
