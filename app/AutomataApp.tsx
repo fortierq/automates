@@ -55,14 +55,14 @@ function State({ data, selected }: { data: StateData; selected?: boolean }) {
 }
 
 function AutomatonEdge(props: EdgeProps<Edge>) {
-  const { id, source, target, sourceX, sourceY, targetX, targetY, markerEnd, label, selected } = props;
+  const { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, label, selected } = props;
   const loop = source === target;
-  const [regularPath, regularLabelX, regularLabelY] = getBezierPath({ sourceX, sourceY, targetX, targetY });
+  const [regularPath, regularLabelX, regularLabelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
   const path = loop
     ? `M ${sourceX} ${sourceY} C ${sourceX + 62} ${sourceY - 92}, ${targetX - 62} ${targetY - 92}, ${targetX} ${targetY}`
     : regularPath;
   const labelX = loop ? (sourceX + targetX) / 2 : regularLabelX;
-  const labelY = loop ? Math.min(sourceY, targetY) - 67 : regularLabelY;
+  const labelY = loop ? Math.min(sourceY, targetY) - 67 : regularLabelY - 18;
 
   return (
     <>
