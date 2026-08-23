@@ -13,8 +13,8 @@ export const starterNodes: StateNode[] = [
 ];
 
 export const starterEdges: Edge[] = [
-  { id: 'q0-q1-a', source: 'q0', target: 'q1', label: 'a', type: 'smoothstep' },
-  { id: 'q1-q1-b', source: 'q1', target: 'q1', label: 'b', type: 'smoothstep' },
+  { id: 'q0-q1-a', source: 'q0', target: 'q1', label: 'a', type: 'automaton' },
+  { id: 'q1-q1-b', source: 'q1', target: 'q1', label: 'b', type: 'automaton' },
 ];
 
 type GraphStore = {
