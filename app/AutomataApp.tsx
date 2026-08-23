@@ -21,6 +21,8 @@ import {
   type ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import {
   ArrowRight,
   BookOpen,
@@ -28,7 +30,6 @@ import {
   Clipboard,
   Download,
   MousePointer2,
-  Play,
   RotateCcw,
   Trash2,
   X,
@@ -40,6 +41,10 @@ type Section = 'draw' | 'language' | 'regex' | 'methods';
 type EdgeRouteData = {
   routeOffset?: number;
 };
+
+function MathText({ children }: { children: string }) {
+  return <span className="math" dangerouslySetInnerHTML={{ __html: katex.renderToString(children, { throwOnError: false }) }} />;
+}
 
 function State({ data, selected }: { data: StateData; selected?: boolean }) {
   return (
@@ -96,19 +101,6 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
 
 const nodeTypes = { state: State };
 const edgeTypes = { automaton: AutomatonEdge };
-
-function accepts(nodes: StateNode[], edges: Edge[], word: string) {
-  let current = new Set(nodes.filter((node) => node.data.initial).map((node) => node.id));
-  for (const symbol of word) {
-    const next = new Set<string>();
-    edges.forEach((edge) => {
-      const labels = String(edge.label ?? '').split(',').map((item) => item.trim());
-      if (current.has(edge.source) && labels.includes(symbol)) next.add(edge.target);
-    });
-    current = next;
-  }
-  return nodes.some((node) => node.data.final && current.has(node.id));
-}
 
 function compareWithWordsEndingInA(nodes: StateNode[], edges: Edge[]) {
   const alphabet = ['a', 'b'];
@@ -266,9 +258,6 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [testWord, setTestWord] = useState('abb');
-  const [testResult, setTestResult] = useState<boolean | null>(null);
-  const [panel, setPanel] = useState<'properties' | 'test'>('properties');
   const [notice, setNotice] = useState('Enregistré localement');
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
 
@@ -287,7 +276,6 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
   const onNodeClick: NodeMouseHandler<StateNode> = (_, node) => {
     setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
-    setPanel('properties');
   };
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
@@ -322,11 +310,6 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
     URL.revokeObjectURL(url);
   };
 
-  const test = () => {
-    setTestResult(accepts(nodes, edges, testWord));
-    setPanel('test');
-  };
-
   return (
     <section className={`workspace ${challenge ? 'has-challenge' : ''}`}>
       {challenge && <div className="challenge-bar">{challenge}</div>}
@@ -342,7 +325,7 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
           onEdgesChange={(changes) => setEdges(applyEdgeChanges(changes, edges))}
           onConnect={(connection: Connection) => setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: 'a', type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }])}
           onNodeClick={onNodeClick}
-          onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); setPanel('properties'); }}
+          onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
           onPaneClick={(event) => { setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
           onNodesDelete={(deleted) => { if (deleted.some((node) => node.id === selectedNodeId)) setSelectedNodeId(null); }}
           onEdgesDelete={(deleted) => { if (deleted.some((edge) => edge.id === selectedEdgeId)) setSelectedEdgeId(null); }}
@@ -354,9 +337,7 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
       </section>
 
       <aside className="side-panel">
-        <div className="tabs"><button className={panel === 'properties' ? 'active' : ''} onClick={() => setPanel('properties')}>Propriétés</button><button className={panel === 'test' ? 'active' : ''} onClick={() => setPanel('test')}>Tester</button></div>
-        {panel === 'properties' ? (
-          selectedNode ? (
+        {selectedNode ? (
             <div className="properties-form">
               <span className="eyebrow">État sélectionné</span>
               <label htmlFor="state-label">Nom</label>
@@ -373,15 +354,8 @@ function Editor({ challenge }: { challenge?: React.ReactNode }) {
               <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
               <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
             </div>
-          ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état, puis reliez ses poignées pour créer une transition.</p></div>
-        ) : (
-          <div className="test-panel">
-            <span className="eyebrow">Mot à reconnaître</span>
-            <div className="test-row"><input className="text-input mono" value={testWord} placeholder="abba" onChange={(event) => { setTestWord(event.target.value); setTestResult(null); }} /><button className="square-button" onClick={test} aria-label="Tester le mot"><Play /></button></div>
-            {testResult !== null && <div className={`result-box ${testResult ? 'success' : 'failure'}`}>{testResult ? <Check /> : <X />}<span><strong>{testResult ? 'Mot accepté' : 'Mot refusé'}</strong><small>{testWord || 'ε'} termine {testResult ? '' : 'pas '}dans un état final.</small></span></div>}
-          </div>
-        )}
-        <div className="export-card"><span className="eyebrow">Exporter</span><h2>Prêt pour votre copie</h2><p>Code TikZ compatible avec la bibliothèque <code>automata</code>.</p><div className="export-actions"><button className="primary" onClick={copyLatex}><Clipboard /> Copier le LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger le fichier LaTeX"><Download /></button></div></div>
+          ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état, puis reliez ses poignées pour créer une transition.</p></div>}
+        <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier le LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger le fichier LaTeX"><Download /></button></div>
       </aside>
 
     </section>
@@ -409,7 +383,7 @@ function LanguageExercise() {
     });
   };
   return <Editor challenge={<>
-    <div className="challenge-copy"><span className="eyebrow">Exercice · Langage → automate</span><strong>Mots sur Σ = {'{a, b}'} se terminant par a</strong><span>Acceptés : <code>a</code>, <code>ba</code>, <code>abba</code> · Refusés : <code>ε</code>, <code>b</code>, <code>aab</code></span></div>
+    <div className="challenge-copy"><strong>Mots sur <MathText>{'\\Sigma = \\{a,b\\}'}</MathText> se terminant par <MathText>a</MathText></strong><span>Acceptés : <MathText>a</MathText>, <MathText>ba</MathText>, <MathText>abba</MathText> · Refusés : <MathText>\\varepsilon</MathText>, <MathText>b</MathText>, <MathText>aab</MathText></span></div>
     <div className="challenge-actions">{feedback && <Feedback {...feedback} />}<button className="ghost-button" onClick={restart}><RotateCcw /> Recommencer</button><button className="primary" onClick={check}><Check /> Vérifier l’automate</button></div>
   </>} />;
 }
@@ -429,8 +403,8 @@ function RegexExercise() {
     }
   };
   return <ExerciseLayout title="Retrouver une expression régulière équivalente." progress="Automate → expression">
-    <article className="prompt-card"><span className="number">02</span><span className="difficulty">Essentiel</span><h2>Donner une expression régulière</h2><p>L’automate lit <code>a</code> de q₀ à q₁, puis <code>b</code> pour atteindre l’unique état final q₂.</p><div className="mini-automaton three"><span className="mini-node initial">q₀</span><span className="mini-edge">a →</span><span className="mini-node">q₁</span><span className="mini-edge">b →</span><span className="mini-node final">q₂</span></div></article>
-    <article className="answer-card"><label htmlFor="regex">Votre expression</label><input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} placeholder="Ex. (a|a)b" /><p>Notation : <code>|</code> ou <code>+</code> pour l’union, <code>*</code>, <code>ε</code> et parenthèses. La correction compare les langages, pas le texte.</p><button className="outline-button" onClick={check}><Check /> Vérifier l’expression</button>{feedback && <Feedback {...feedback} />}</article>
+    <article className="prompt-card"><span className="number">02</span><span className="difficulty">Essentiel</span><h2>Donner une expression régulière</h2><p>L’automate lit <MathText>a</MathText> de <MathText>{'q_0'}</MathText> à <MathText>{'q_1'}</MathText>, puis <MathText>b</MathText> pour atteindre l’unique état final <MathText>{'q_2'}</MathText>.</p><div className="mini-automaton three"><span className="mini-node initial"><MathText>{'q_0'}</MathText></span><span className="mini-edge"><MathText>a</MathText> →</span><span className="mini-node"><MathText>{'q_1'}</MathText></span><span className="mini-edge"><MathText>b</MathText> →</span><span className="mini-node final"><MathText>{'q_2'}</MathText></span></div></article>
+    <article className="answer-card"><label htmlFor="regex">Votre expression</label><input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} placeholder="Ex. (a|a)b" /><p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>\\varepsilon</MathText> et parenthèses. La correction compare les langages, pas le texte.</p><button className="outline-button" onClick={check}><Check /> Vérifier l’expression</button>{feedback && <Feedback {...feedback} />}</article>
   </ExerciseLayout>;
 }
 
