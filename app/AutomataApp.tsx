@@ -165,9 +165,11 @@ function toLatex(nodes: StateNode[], edges: Edge[]) {
 }
 
 type RegexAst =
-  | { kind: 'empty' | 'epsilon' }
+  | { kind: 'empty' }
+  | { kind: 'epsilon' }
   | { kind: 'literal'; value: string }
-  | { kind: 'union' | 'concat'; parts: RegexAst[] }
+  | { kind: 'union'; parts: RegexAst[] }
+  | { kind: 'concat'; parts: RegexAst[] }
   | { kind: 'star'; inner: RegexAst };
 
 const empty: RegexAst = { kind: 'empty' };
