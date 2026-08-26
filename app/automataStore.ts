@@ -8,8 +8,8 @@ export type StateData = { label: string; initial?: boolean; final?: boolean };
 export type StateNode = Node<StateData, 'state'>;
 
 export const starterNodes: StateNode[] = [
-  { id: 'q0', type: 'state', position: { x: 120, y: 190 }, data: { label: 'q₀', initial: true } },
-  { id: 'q1', type: 'state', position: { x: 410, y: 190 }, data: { label: 'q₁', final: true } },
+  { id: 'q0', type: 'state', position: { x: 120, y: 190 }, data: { label: 'q0', initial: true } },
+  { id: 'q1', type: 'state', position: { x: 410, y: 190 }, data: { label: 'q1', final: true } },
 ];
 
 export const starterEdges: Edge[] = [

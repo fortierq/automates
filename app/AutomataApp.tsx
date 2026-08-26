@@ -27,6 +27,7 @@ import {
   ArrowRight,
   BookOpen,
   Check,
+  ChevronDown,
   Clipboard,
   Download,
   Menu,
@@ -46,6 +47,7 @@ type LanguageExerciseDefinition = {
   id: number;
   title: string;
   prompt: string;
+  alphabet: string[];
   accepted: string[];
   rejected: string[];
   initial: string;
@@ -112,22 +114,27 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
 
 const nodeTypes = { state: State };
 const edgeTypes = { automaton: AutomatonEdge };
+const alphabetAB = ['a', 'b'];
 
 const languageExercises: LanguageExerciseDefinition[] = [
-  { id: 1, title: 'Mot vide', prompt: 'Reconnaître le mot vide.', accepted: [''], rejected: ['a', 'b', 'ab'], initial: 'start', isFinal: (state) => state === 'start', transition: () => 'dead' },
-  { id: 2, title: 'Le mot a uniquement', prompt: 'Reconnaître uniquement le mot a.', accepted: ['a'], rejected: ['', 'b', 'aa'], initial: 'start', isFinal: (state) => state === 'a', transition: (state, symbol) => state === 'start' && symbol === 'a' ? 'a' : 'dead' },
-  { id: 3, title: 'Se terminer par a', prompt: 'Reconnaître les mots qui se terminent par a.', accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no', isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no' },
-  { id: 4, title: 'Commencer par b', prompt: 'Reconnaître les mots qui commencent par b.', accepted: ['b', 'ba', 'bbaa'], rejected: ['', 'a', 'ab'], initial: 'start', isFinal: (state) => state === 'yes', transition: (state, symbol) => state === 'start' ? (symbol === 'b' ? 'yes' : 'no') : state },
-  { id: 5, title: 'Contenir ab', prompt: 'Reconnaître les mots qui contiennent le facteur ab.', accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], initial: '0', isFinal: (state) => state === '2', transition: (state, symbol) => state === '2' ? '2' : state === '1' && symbol === 'b' ? '2' : symbol === 'a' ? '1' : '0' },
-  { id: 6, title: 'Un nombre pair de a', prompt: 'Reconnaître les mots contenant un nombre pair de lettres a.', accepted: ['', 'bb', 'aa', 'abba'], rejected: ['a', 'ba', 'aaa'], initial: 'even', isFinal: (state) => state === 'even', transition: (state, symbol) => symbol === 'a' ? (state === 'even' ? 'odd' : 'even') : state },
-  { id: 7, title: 'Aucun facteur bb', prompt: 'Reconnaître les mots qui ne contiennent jamais deux b consécutifs.', accepted: ['', 'a', 'bab', 'ababa'], rejected: ['bb', 'abb', 'bba'], initial: 'ok', isFinal: (state) => state !== 'dead', transition: (state, symbol) => state === 'dead' ? 'dead' : symbol === 'a' ? 'ok' : state === 'b' ? 'dead' : 'b' },
-  { id: 8, title: 'Exactement deux a', prompt: 'Reconnaître les mots contenant exactement deux lettres a.', accepted: ['aa', 'aba', 'bbaab'], rejected: ['', 'a', 'aaa'], initial: '0', isFinal: (state) => state === '2', transition: (state, symbol) => symbol === 'b' ? state : String(Math.min(3, Number(state) + 1)) },
-  { id: 9, title: 'Parités combinées', prompt: 'Reconnaître les mots ayant un nombre pair de a et un nombre impair de b.', accepted: ['b', 'aab', 'baabb'], rejected: ['', 'a', 'bb', 'ab'], initial: '00', isFinal: (state) => state === '01', transition: (state, symbol) => symbol === 'a' ? `${1 - Number(state[0])}${state[1]}` : `${state[0]}${1 - Number(state[1])}` },
-  { id: 10, title: 'Contenir aba et bab', prompt: 'Reconnaître les mots qui contiennent à la fois les facteurs aba et bab.', accepted: ['abab', 'baba', 'aababb'], rejected: ['', 'aba', 'bab', 'abba'], initial: '0|', isFinal: (state) => state.startsWith('3|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; } },
+  { id: 1, title: 'Mot vide', prompt: 'Reconnaître le mot vide.', alphabet: alphabetAB, accepted: [''], rejected: ['a', 'b', 'ab'], initial: 'start', isFinal: (state) => state === 'start', transition: () => 'dead' },
+  { id: 2, title: 'Le mot a uniquement', prompt: 'Reconnaître uniquement le mot a.', alphabet: alphabetAB, accepted: ['a'], rejected: ['', 'b', 'aa'], initial: 'start', isFinal: (state) => state === 'a', transition: (state, symbol) => state === 'start' && symbol === 'a' ? 'a' : 'dead' },
+  { id: 3, title: 'Se terminer par a', prompt: 'Reconnaître les mots qui se terminent par a.', alphabet: alphabetAB, accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no', isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no' },
+  { id: 4, title: 'Commencer par b', prompt: 'Reconnaître les mots qui commencent par b.', alphabet: alphabetAB, accepted: ['b', 'ba', 'bbaa'], rejected: ['', 'a', 'ab'], initial: 'start', isFinal: (state) => state === 'yes', transition: (state, symbol) => state === 'start' ? (symbol === 'b' ? 'yes' : 'no') : state },
+  { id: 5, title: 'Contenir ab', prompt: 'Reconnaître les mots qui contiennent le facteur ab.', alphabet: alphabetAB, accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], initial: '0', isFinal: (state) => state === '2', transition: (state, symbol) => state === '2' ? '2' : state === '1' && symbol === 'b' ? '2' : symbol === 'a' ? '1' : '0' },
+  { id: 6, title: 'Un nombre pair de a', prompt: 'Reconnaître les mots contenant un nombre pair de lettres a.', alphabet: alphabetAB, accepted: ['', 'bb', 'aa', 'abba'], rejected: ['a', 'ba', 'aaa'], initial: 'even', isFinal: (state) => state === 'even', transition: (state, symbol) => symbol === 'a' ? (state === 'even' ? 'odd' : 'even') : state },
+  { id: 7, title: 'Aucun facteur bb', prompt: 'Reconnaître les mots qui ne contiennent jamais deux b consécutifs.', alphabet: alphabetAB, accepted: ['', 'a', 'bab', 'ababa'], rejected: ['bb', 'abb', 'bba'], initial: 'ok', isFinal: (state) => state !== 'dead', transition: (state, symbol) => state === 'dead' ? 'dead' : symbol === 'a' ? 'ok' : state === 'b' ? 'dead' : 'b' },
+  { id: 8, title: 'Exactement deux a', prompt: 'Reconnaître les mots contenant exactement deux lettres a.', alphabet: alphabetAB, accepted: ['aa', 'aba', 'bbaab'], rejected: ['', 'a', 'aaa'], initial: '0', isFinal: (state) => state === '2', transition: (state, symbol) => symbol === 'b' ? state : String(Math.min(3, Number(state) + 1)) },
+  { id: 9, title: 'Parités combinées', prompt: 'Reconnaître les mots ayant un nombre pair de a et un nombre impair de b.', alphabet: alphabetAB, accepted: ['b', 'aab', 'baabb'], rejected: ['', 'a', 'bb', 'ab'], initial: '00', isFinal: (state) => state === '01', transition: (state, symbol) => symbol === 'a' ? `${1 - Number(state[0])}${state[1]}` : `${state[0]}${1 - Number(state[1])}` },
+  { id: 10, title: 'Contenir aba et bab', prompt: 'Reconnaître les mots qui contiennent à la fois les facteurs aba et bab.', alphabet: alphabetAB, accepted: ['abab', 'baba', 'aababb'], rejected: ['', 'aba', 'bab', 'abba'], initial: '0|', isFinal: (state) => state.startsWith('3|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; } },
+  { id: 11, title: 'Multiples de trois en binaire', prompt: 'Reconnaître les écritures binaires non vides des entiers divisibles par trois. Les zéros initiaux sont autorisés.', alphabet: ['0', '1'], accepted: ['0', '11', '110', '1001'], rejected: ['', '1', '10', '101'], initial: 'start', isFinal: (state) => state === 'r0', transition: (state, symbol) => { const remainder = state === 'start' ? 0 : Number(state[1]); return `r${(remainder * 2 + Number(symbol)) % 3}`; } },
+  { id: 12, title: 'Jamais trois bits identiques', prompt: 'Reconnaître les mots binaires ne contenant ni 000 ni 111 comme facteur.', alphabet: ['0', '1'], accepted: ['', '0011', '01010', '1100'], rejected: ['000', '111', '10001'], initial: 'start', isFinal: (state) => state !== 'dead', transition: (state, symbol) => { if (state === 'dead' || state === symbol.repeat(2)) return 'dead'; return state.endsWith(symbol) ? symbol.repeat(2) : symbol; } },
+  { id: 13, title: 'Séparateur assorti', prompt: 'Reconnaître les mots contenant exactement un #, avec le même symbole juste avant et juste après #.', alphabet: ['0', '1', '#'], accepted: ['0#0', '101#1', '10#01'], rejected: ['#0', '0#', '0#1', '0#0#0'], initial: 'left-none', isFinal: (state) => state === 'ok', transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'ok') return symbol === '#' ? 'dead' : 'ok'; if (state === 'need-0' || state === 'need-1') return symbol === state.at(-1) ? 'ok' : 'dead'; if (symbol === '#') return state === 'left-none' ? 'dead' : `need-${state.at(-1)}`; return `left-${symbol}`; } },
+  { id: 14, title: 'Trois parités synchronisées', prompt: 'Reconnaître les mots où les nombres de a, de b et de c ont tous la même parité.', alphabet: ['a', 'b', 'c'], accepted: ['', 'abc', 'aabbcc', 'abccba'], rejected: ['a', 'ab', 'abbc'], initial: '000', isFinal: (state) => state === '000' || state === '111', transition: (state, symbol) => { const index = ['a', 'b', 'c'].indexOf(symbol); return state.split('').map((bit, position) => position === index ? String(1 - Number(bit)) : bit).join(''); } },
+  { id: 15, title: 'Congruence croisée modulo cinq', prompt: 'Reconnaître les mots tels que le nombre de a soit congru au double du nombre de b modulo cinq.', alphabet: alphabetAB, accepted: ['', 'aab', 'bbbbb', 'aaaaa'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0', isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : 3)) % 5) },
 ];
 
 function compareLanguage(nodes: StateNode[], edges: Edge[], exercise: LanguageExerciseDefinition) {
-  const alphabet = ['a', 'b'];
   const initialStates = nodes.filter((node) => node.data.initial).map((node) => node.id).sort();
   const queue = [{ states: initialStates, targetState: exercise.initial, word: '' }];
   const visited = new Set<string>();
@@ -143,7 +150,7 @@ function compareLanguage(nodes: StateNode[], edges: Edge[], exercise: LanguageEx
       return { equivalent: false as const, word: current.word, studentAccepts };
     }
 
-    for (const symbol of alphabet) {
+    for (const symbol of exercise.alphabet) {
       const sources = new Set(current.states);
       const states = [...new Set(edges
         .filter((edge) => sources.has(edge.source) && String(edge.label ?? '').split(',').map((item) => item.trim()).includes(symbol))
@@ -280,7 +287,7 @@ function compareRegex(left: RegexAst, right: RegexAst) {
   return { equivalent: true };
 }
 
-function Editor({ sidebarContent }: { sidebarContent?: React.ReactNode }) {
+function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: React.ReactNode; defaultSymbol?: string }) {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
@@ -350,7 +357,7 @@ function Editor({ sidebarContent }: { sidebarContent?: React.ReactNode }) {
           onInit={(instance) => { flow.current = instance; }}
           onNodesChange={(changes) => setNodes(applyNodeChanges(changes, nodes) as StateNode[])}
           onEdgesChange={(changes) => setEdges(applyEdgeChanges(changes, edges))}
-          onConnect={(connection: Connection) => setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: 'a', type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }])}
+          onConnect={(connection: Connection) => setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: defaultSymbol, type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }])}
           onNodeClick={onNodeClick}
           onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
           onPaneClick={(event) => { setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
@@ -397,6 +404,7 @@ function Editor({ sidebarContent }: { sidebarContent?: React.ReactNode }) {
 function LanguageExercise() {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [exerciseId, setExerciseId] = useState(1);
+  const [exerciseMenuOpen, setExerciseMenuOpen] = useState(false);
   const [solved, setSolved] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const exercise = languageExercises[exerciseId - 1];
@@ -419,6 +427,7 @@ function LanguageExercise() {
 
   const selectExercise = (id: number) => {
     setExerciseId(id);
+    setExerciseMenuOpen(false);
     restart();
   };
 
@@ -439,15 +448,16 @@ function LanguageExercise() {
       text: `Contre-exemple : « ${word} » est ${result.studentAccepts ? 'accepté par votre automate, mais pas par le langage demandé' : 'refusé par votre automate, mais appartient au langage demandé'}.`,
     });
   };
-  const showWord = (word: string) => word ? <MathText>{word}</MathText> : <MathText>{'\\varepsilon'}</MathText>;
-  return <Editor sidebarContent={<section className="language-task">
+  const showWord = (word: string) => word ? <MathText>{word.replaceAll('#', '\\#')}</MathText> : <MathText>{'\\varepsilon'}</MathText>;
+  return <Editor defaultSymbol={exercise.alphabet[0]} sidebarContent={<section className="language-task">
     <label htmlFor="language-exercise">Exercice</label>
-    <select id="language-exercise" value={exerciseId} onChange={(event) => selectExercise(Number(event.target.value))}>
-      {languageExercises.map((item) => <option key={item.id} value={item.id}>{solved.includes(item.id) ? '✓ ' : ''}{String(item.id).padStart(2, '0')} — {item.title}</option>)}
-    </select>
+    <div className="exercise-picker" onKeyDown={(event) => { if (event.key === 'Escape') setExerciseMenuOpen(false); }}>
+      <button id="language-exercise" className={`exercise-picker-trigger ${solved.includes(exercise.id) ? 'is-solved' : ''}`} aria-haspopup="listbox" aria-expanded={exerciseMenuOpen} onClick={() => setExerciseMenuOpen((open) => !open)}><span>{String(exercise.id).padStart(2, '0')} — {exercise.title}</span><ChevronDown /></button>
+      {exerciseMenuOpen && <div className="exercise-picker-menu" role="listbox" aria-label="Choisir un exercice">{languageExercises.map((item) => <button key={item.id} role="option" aria-selected={item.id === exercise.id} className={`${solved.includes(item.id) ? 'is-solved' : ''} ${item.id === exercise.id ? 'is-current' : ''}`} onClick={() => selectExercise(item.id)}><span>{String(item.id).padStart(2, '0')}</span>{item.title}</button>)}</div>}
+    </div>
     <h2>{exercise.title}</h2>
-    <p>{exercise.prompt} Alphabet : <MathText>{'\\Sigma = \\{a,b\\}'}</MathText>.</p>
-    <div className="word-examples"><span><strong>Acceptés</strong>{exercise.accepted.map((word, index) => <span key={`${word}-${index}`}>{showWord(word)}</span>)}</span><span><strong>Refusés</strong>{exercise.rejected.map((word, index) => <span key={`${word}-${index}`}>{showWord(word)}</span>)}</span></div>
+    <p>{exercise.prompt}</p>
+    <div className="language-data"><section><strong>Alphabet</strong><div className="math-chips">{exercise.alphabet.map((symbol) => <span className="math-chip" key={symbol}>{showWord(symbol)}</span>)}</div></section><section><strong>Exemples de mots</strong><div className="example-row"><span>Acceptés</span><div className="math-chips">{exercise.accepted.map((word, index) => <span className="math-chip accepted" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div><div className="example-row"><span>Refusés</span><div className="math-chips">{exercise.rejected.map((word, index) => <span className="math-chip rejected" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div></section></div>
     {feedback && <Feedback {...feedback} />}
     <div className="exercise-buttons"><button className="ghost-button" onClick={restart}><RotateCcw /> Recommencer</button><button className="primary" onClick={check}><Check /> Vérifier</button><button className="ghost-button next-exercise" disabled={exerciseId === languageExercises.length} onClick={() => selectExercise(exerciseId + 1)}>Exercice suivant <ArrowRight /></button></div>
   </section>} />;
