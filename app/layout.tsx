@@ -13,17 +13,17 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Automates — entraînement MPI',
-  description: 'Dessiner, tester et comprendre les automates finis.',
+  title: 'Automates en MPI',
+  description: 'Exercices sur les automates finis.',
   openGraph: {
-    title: 'Automates — entraînement MPI',
-    description: 'Dessiner, tester et comprendre les automates finis.',
-    images: [{ url: '/og.png', width: 1730, height: 909, alt: 'Automates — S’entraîner en MPI' }],
+    title: 'Automates en MPI',
+    description: 'Exercices sur les automates finis.',
+    images: [{ url: '/og.png', width: 1730, height: 909, alt: 'Automates en MPI' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Automates — entraînement MPI',
-    description: 'Dessiner, tester et comprendre les automates finis.',
+    title: 'Automates en MPI',
+    description: 'Exercices sur les automates finis.',
     images: ['/og.png'],
   },
 };

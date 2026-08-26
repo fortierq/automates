@@ -114,7 +114,7 @@ const nodeTypes = { state: State };
 const edgeTypes = { automaton: AutomatonEdge };
 
 const languageExercises: LanguageExerciseDefinition[] = [
-  { id: 1, title: 'Le mot vide uniquement', prompt: 'Reconnaître uniquement le mot vide.', accepted: [''], rejected: ['a', 'b', 'ab'], initial: 'start', isFinal: (state) => state === 'start', transition: () => 'dead' },
+  { id: 1, title: 'Mot vide', prompt: 'Reconnaître le mot vide.', accepted: [''], rejected: ['a', 'b', 'ab'], initial: 'start', isFinal: (state) => state === 'start', transition: () => 'dead' },
   { id: 2, title: 'Le mot a uniquement', prompt: 'Reconnaître uniquement le mot a.', accepted: ['a'], rejected: ['', 'b', 'aa'], initial: 'start', isFinal: (state) => state === 'a', transition: (state, symbol) => state === 'start' && symbol === 'a' ? 'a' : 'dead' },
   { id: 3, title: 'Se terminer par a', prompt: 'Reconnaître les mots qui se terminent par a.', accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no', isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no' },
   { id: 4, title: 'Commencer par b', prompt: 'Reconnaître les mots qui commencent par b.', accepted: ['b', 'ba', 'bbaa'], rejected: ['', 'a', 'ab'], initial: 'start', isFinal: (state) => state === 'yes', transition: (state, symbol) => state === 'start' ? (symbol === 'b' ? 'yes' : 'no') : state },
@@ -439,7 +439,7 @@ function LanguageExercise() {
       text: `Contre-exemple : « ${word} » est ${result.studentAccepts ? 'accepté par votre automate, mais pas par le langage demandé' : 'refusé par votre automate, mais appartient au langage demandé'}.`,
     });
   };
-  const showWord = (word: string) => word ? <MathText>{word}</MathText> : <MathText>\\varepsilon</MathText>;
+  const showWord = (word: string) => word ? <MathText>{word}</MathText> : <MathText>{'\\varepsilon'}</MathText>;
   return <Editor sidebarContent={<section className="language-task">
     <label htmlFor="language-exercise">Exercice</label>
     <select id="language-exercise" value={exerciseId} onChange={(event) => selectExercise(Number(event.target.value))}>
@@ -469,7 +469,7 @@ function RegexExercise() {
   };
   return <ExerciseLayout title="Retrouver une expression régulière équivalente." progress="Automate → expression">
     <article className="prompt-card"><span className="number">02</span><span className="difficulty">Essentiel</span><h2>Donner une expression régulière</h2><p>L’automate lit <MathText>a</MathText> de <MathText>{'q_0'}</MathText> à <MathText>{'q_1'}</MathText>, puis <MathText>b</MathText> pour atteindre l’unique état final <MathText>{'q_2'}</MathText>.</p><div className="mini-automaton three"><span className="mini-node initial"><MathText>{'q_0'}</MathText></span><span className="mini-edge"><MathText>a</MathText> →</span><span className="mini-node"><MathText>{'q_1'}</MathText></span><span className="mini-edge"><MathText>b</MathText> →</span><span className="mini-node final"><MathText>{'q_2'}</MathText></span></div></article>
-    <article className="answer-card"><label htmlFor="regex">Votre expression</label><input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} placeholder="Ex. (a|a)b" /><p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>\\varepsilon</MathText> et parenthèses. La correction compare les langages, pas le texte.</p><button className="outline-button" onClick={check}><Check /> Vérifier l’expression</button>{feedback && <Feedback {...feedback} />}</article>
+    <article className="answer-card"><label htmlFor="regex">Votre expression</label><input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} placeholder="Ex. (a|a)b" /><p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>{'\\varepsilon'}</MathText> et parenthèses. La correction compare les langages, pas le texte.</p><button className="outline-button" onClick={check}><Check /> Vérifier l’expression</button>{feedback && <Feedback {...feedback} />}</article>
   </ExerciseLayout>;
 }
 
