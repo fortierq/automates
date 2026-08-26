@@ -84,11 +84,14 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
     labelX = (sourceX + targetX) / 2;
     labelY = Math.min(sourceY, targetY) - 67 - offset;
   } else if (offset !== 0) {
-    const x = (sourceX + targetX) / 2;
-    const y = (sourceY + targetY) / 2 + offset;
-    path = `M ${sourceX} ${sourceY} Q ${x} ${y}, ${targetX} ${targetY}`;
-    labelX = x;
-    labelY = y / 2 + (sourceY + targetY) / 4 - 16;
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+    const length = Math.hypot(dx, dy) || 1;
+    const controlX = (sourceX + targetX) / 2 - (dy / length) * offset;
+    const controlY = (sourceY + targetY) / 2 + (dx / length) * offset;
+    path = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY}, ${targetX} ${targetY}`;
+    labelX = (sourceX + 2 * controlX + targetX) / 4;
+    labelY = (sourceY + 2 * controlY + targetY) / 4 - 16;
   }
 
   return (
@@ -317,7 +320,12 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   const routedEdges = useMemo(() => edges.map((edge) => {
     const siblings = edges.filter((item) => item.source === edge.source && item.target === edge.target);
     const index = siblings.findIndex((item) => item.id === edge.id);
-    const routeOffset = edge.source === edge.target ? index * 40 : (index - (siblings.length - 1) / 2) * 64;
+    const hasReverse = edge.source !== edge.target && edges.some((item) => item.source === edge.target && item.target === edge.source);
+    const routeOffset = edge.source === edge.target
+      ? index * 40
+      : hasReverse
+        ? 56 + index * 40
+        : (index - (siblings.length - 1) / 2) * 64;
     return {
       ...edge,
       type: 'automaton',
@@ -387,7 +395,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           ) : selectedEdge ? (
             <div className="properties-form">
               <span className="eyebrow">Transition sélectionnée</span>
-              <label htmlFor="edge-label">Lettre(s)</label>
+              <label htmlFor="edge-label">Lettres (séparées par des virgules)</label>
               <input id="edge-label" className="text-input mono" autoFocus value={String(selectedEdge.label ?? '')} onChange={(event) => setEdges(edges.map((edge) => edge.id === selectedEdge.id ? { ...edge, label: event.target.value } : edge))} />
               <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
               <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
