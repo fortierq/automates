@@ -341,7 +341,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
     const used = new Set(nodes.map((node) => node.id));
     let index = 0;
     while (used.has(`q${index}`)) index += 1;
-    setNodes([...nodes, { id: `q${index}`, type: 'state', position, data: { label: `q${index}` } }]);
+    setNodes([...nodes, { id: `q${index}`, type: 'state', position, data: { label: String(index) } }]);
   }, [nodes, setNodes]);
 
   const onNodeClick: NodeMouseHandler<StateNode> = (_, node) => {
@@ -462,7 +462,7 @@ function LanguageExercise() {
   }, []);
 
   const restart = () => {
-    setNodes([{ id: 'q0', type: 'state', position: { x: 180, y: 200 }, data: { label: 'q₀', initial: true } }]);
+    setNodes([{ id: 'q0', type: 'state', position: { x: 180, y: 200 }, data: { label: '0', initial: true } }]);
     setEdges([]);
     setFeedback(null);
   };

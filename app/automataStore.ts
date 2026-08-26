@@ -8,8 +8,8 @@ export type StateData = { label: string; initial?: boolean; final?: boolean };
 export type StateNode = Node<StateData, 'state'>;
 
 export const starterNodes: StateNode[] = [
-  { id: 'q0', type: 'state', position: { x: 120, y: 190 }, data: { label: 'q0', initial: true } },
-  { id: 'q1', type: 'state', position: { x: 410, y: 190 }, data: { label: 'q1', final: true } },
+  { id: 'q0', type: 'state', position: { x: 120, y: 190 }, data: { label: '0', initial: true } },
+  { id: 'q1', type: 'state', position: { x: 410, y: 190 }, data: { label: '1', final: true } },
 ];
 
 export const starterEdges: Edge[] = [
@@ -34,6 +34,19 @@ export const useGraphStore = create<GraphStore>()(
       setEdges: (edges) => set({ edges }),
       reset: (empty = false) => set({ nodes: empty ? [] : starterNodes, edges: empty ? [] : starterEdges }),
     }),
-    { name: 'automates-mpi-graph' },
+    {
+      name: 'automates-mpi-graph',
+      version: 1,
+      migrate: (persisted) => {
+        const state = persisted as GraphStore;
+        return {
+          ...state,
+          nodes: state.nodes.map((node) => {
+            const match = node.data.label.match(/^q(\d+)$/);
+            return match ? { ...node, data: { ...node.data, label: match[1] } } : node;
+          }),
+        };
+      },
+    },
   ),
 );
