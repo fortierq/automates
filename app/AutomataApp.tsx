@@ -8,12 +8,12 @@ import {
   BaseEdge,
   Controls,
   EdgeLabelRenderer,
-  getBezierPath,
   Handle,
   MarkerType,
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useInternalNode,
   type Connection,
   type Edge,
   type EdgeProps,
@@ -71,27 +71,57 @@ function State({ data, selected }: { data: StateData; selected?: boolean }) {
 }
 
 function AutomatonEdge(props: EdgeProps<Edge>) {
-  const { id, source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, label, selected } = props;
+  const { id, source, target, sourceX, sourceY, targetX, targetY, markerEnd, label, selected } = props;
+  const sourceNode = useInternalNode<StateNode>(source);
+  const targetNode = useInternalNode<StateNode>(target);
   const data = (props.data ?? {}) as EdgeRouteData;
   const loop = source === target;
   const offset = data.routeOffset ?? 0;
-  const [regularPath, regularLabelX, regularLabelY] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition });
-  let path = regularPath;
-  let labelX = regularLabelX;
-  let labelY = regularLabelY - 18;
+  let path = `M ${sourceX} ${sourceY} L ${targetX} ${targetY}`;
+  let labelX = (sourceX + targetX) / 2;
+  let labelY = (sourceY + targetY) / 2 - 18;
   if (loop) {
     path = `M ${sourceX} ${sourceY} C ${sourceX + 62 + offset / 2} ${sourceY - 92 - offset}, ${targetX - 62 - offset / 2} ${targetY - 92 - offset}, ${targetX} ${targetY}`;
     labelX = (sourceX + targetX) / 2;
     labelY = Math.min(sourceY, targetY) - 67 - offset;
-  } else if (offset !== 0) {
-    const dx = targetX - sourceX;
-    const dy = targetY - sourceY;
+  } else if (sourceNode && targetNode) {
+    const sourceWidth = sourceNode.measured.width ?? 72;
+    const sourceHeight = sourceNode.measured.height ?? 72;
+    const targetWidth = targetNode.measured.width ?? 72;
+    const targetHeight = targetNode.measured.height ?? 72;
+    const sourceCenter = {
+      x: sourceNode.internals.positionAbsolute.x + sourceWidth / 2,
+      y: sourceNode.internals.positionAbsolute.y + sourceHeight / 2,
+    };
+    const targetCenter = {
+      x: targetNode.internals.positionAbsolute.x + targetWidth / 2,
+      y: targetNode.internals.positionAbsolute.y + targetHeight / 2,
+    };
+    const dx = targetCenter.x - sourceCenter.x;
+    const dy = targetCenter.y - sourceCenter.y;
     const length = Math.hypot(dx, dy) || 1;
-    const controlX = (sourceX + targetX) / 2 - (dy / length) * offset;
-    const controlY = (sourceY + targetY) / 2 + (dx / length) * offset;
-    path = `M ${sourceX} ${sourceY} Q ${controlX} ${controlY}, ${targetX} ${targetY}`;
-    labelX = (sourceX + 2 * controlX + targetX) / 4;
-    labelY = (sourceY + 2 * controlY + targetY) / 4 - 16;
+    const normal = { x: -dy / length, y: dx / length };
+    const control = {
+      x: (sourceCenter.x + targetCenter.x) / 2 + normal.x * offset,
+      y: (sourceCenter.y + targetCenter.y) / 2 + normal.y * offset,
+    };
+    const boundaryPoint = (center: { x: number; y: number }, toward: { x: number; y: number }, radius: number, gap = 0) => {
+      const pointDx = toward.x - center.x;
+      const pointDy = toward.y - center.y;
+      const pointLength = Math.hypot(pointDx, pointDy) || 1;
+      return { x: center.x + pointDx / pointLength * (radius + gap), y: center.y + pointDy / pointLength * (radius + gap) };
+    };
+    const sourcePoint = boundaryPoint(sourceCenter, offset === 0 ? targetCenter : control, Math.min(sourceWidth, sourceHeight) / 2);
+    const targetPoint = boundaryPoint(targetCenter, offset === 0 ? sourceCenter : control, Math.min(targetWidth, targetHeight) / 2, 3);
+    if (offset === 0) {
+      path = `M ${sourcePoint.x} ${sourcePoint.y} L ${targetPoint.x} ${targetPoint.y}`;
+      labelX = (sourcePoint.x + targetPoint.x) / 2;
+      labelY = (sourcePoint.y + targetPoint.y) / 2 - 18;
+    } else {
+      path = `M ${sourcePoint.x} ${sourcePoint.y} Q ${control.x} ${control.y}, ${targetPoint.x} ${targetPoint.y}`;
+      labelX = (sourcePoint.x + 2 * control.x + targetPoint.x) / 4 + normal.x * 14;
+      labelY = (sourcePoint.y + 2 * control.y + targetPoint.y) / 4 + normal.y * 14;
+    }
   }
 
   return (
@@ -170,7 +200,11 @@ function toLatex(nodes: StateNode[], edges: Edge[]) {
     const options = ['state', node.data.initial && 'initial', node.data.final && 'accepting'].filter(Boolean).join(', ');
     return `  \\node[${options}] (${node.id}) at (${(node.position.x / 100).toFixed(1)},${(-node.position.y / 100).toFixed(1)}) {$${node.data.label}$};`;
   });
-  const edgeLines = edges.map((edge) => `    (${edge.source}) edge${edge.source === edge.target ? '[loop above]' : ''} node {$${String(edge.label ?? '').replaceAll(',', ',\\,')}$} (${edge.target})`);
+  const edgeLines = edges.map((edge) => {
+    const reciprocal = edge.source !== edge.target && edges.some((item) => item.source === edge.target && item.target === edge.source);
+    const options = edge.source === edge.target ? '[loop above]' : reciprocal ? '[bend left=20]' : '';
+    return `    (${edge.source}) edge${options} node {$${String(edge.label ?? '').replaceAll(',', ',\\,')}$} (${edge.target})`;
+  });
   return ['\\begin{tikzpicture}[shorten >=1pt, node distance=2cm, on grid, auto]', ...nodeLines, '  \\path[->]', ...edgeLines.map((line, index) => `${line}${index === edgeLines.length - 1 ? ';' : ''}`), '\\end{tikzpicture}'].join('\n');
 }
 
