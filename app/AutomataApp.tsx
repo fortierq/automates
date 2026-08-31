@@ -157,19 +157,19 @@ const alphabetAB = ['a', 'b'];
 
 const languageExercises: LanguageExerciseDefinition[] = [
   {
-    id: 1, title: 'Positions paires imposées', prompt: 'À toute position paire se trouve la lettre a. Les positions impaires sont libres et la numérotation commence à 1.', alphabet: alphabetAB,
-    accepted: ['', 'a', 'b', 'aa', 'ba', 'aaba'], rejected: ['ab', 'bb', 'babb'], initial: 'even',
-    isFinal: (state) => state !== 'dead', transition: (state, symbol) => state === 'even' ? 'odd' : state === 'odd' && symbol === 'a' ? 'even' : 'dead',
+    id: 1, title: 'Se terminer par a', prompt: 'Le dernier symbole du mot est un a.', alphabet: alphabetAB,
+    accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no',
+    isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no',
   },
   {
-    id: 2, title: 'Deux changements de lettre', prompt: 'Le mot effectue exactement deux changements entre a et b : il est formé de trois blocs non vides alternés.', alphabet: alphabetAB,
-    accepted: ['aba', 'bab', 'aabba', 'aaabbbaa'], rejected: ['', 'a', 'ab', 'abab'], initial: 'start',
-    isFinal: (state) => state.endsWith(':2'), transition: (state, symbol) => { if (state === 'start') return `${symbol}:0`; if (state === 'dead') return 'dead'; const [last, rawChanges] = state.split(':'); const changes = Number(rawChanges) + (last === symbol ? 0 : 1); return changes > 2 ? 'dead' : `${symbol}:${changes}`; },
+    id: 2, title: 'Contenir le facteur ab', prompt: 'Le mot contient deux lettres consécutives ab.', alphabet: alphabetAB,
+    accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], initial: '0',
+    isFinal: (state) => state === '2', transition: (state, symbol) => state === '2' ? '2' : state === '1' && symbol === 'b' ? '2' : symbol === 'a' ? '1' : '0',
   },
   {
-    id: 3, title: 'Même première et dernière lettre', prompt: 'Le mot est non vide et sa dernière lettre est égale à sa première lettre.', alphabet: alphabetAB,
-    accepted: ['a', 'b', 'aa', 'aba', 'baab'], rejected: ['', 'ab', 'ba', 'abb'], initial: 'start',
-    isFinal: (state) => state !== 'start' && state[0] === state[2], transition: (state, symbol) => state === 'start' ? `${symbol}:${symbol}` : `${state[0]}:${symbol}`,
+    id: 3, title: 'Exactement deux a', prompt: 'Le mot contient exactement deux occurrences de la lettre a.', alphabet: alphabetAB,
+    accepted: ['aa', 'aba', 'bbaab'], rejected: ['', 'a', 'aaa'], initial: '0',
+    isFinal: (state) => state === '2', transition: (state, symbol) => symbol === 'b' ? state : String(Math.min(3, Number(state) + 1)),
   },
   {
     id: 4, title: 'Jamais trois bits identiques', prompt: 'Le mot ne contient ni 000 ni 111 comme facteur.', alphabet: ['0', '1'],
@@ -596,7 +596,7 @@ function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRest
 function RegexAnswer({ id, value, onChange, onCheck }: { id: string; value: string; onChange: (value: string) => void; onCheck: () => void }) {
   return <div className="regex-answer">
     <label htmlFor={id}>Votre expression</label>
-    <input id={id} className="regex-input" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Exemple : (a|b)*(ab|e)" />
+    <input id={id} className="regex-input" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Utiliser *, |, e, (...)" />
   </div>;
 }
 
@@ -711,7 +711,7 @@ function LanguageExercise() {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [exerciseId, setExerciseId] = useState(1);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
-  const { solved, markSolved } = useSolvedExercises('automates-mpi-language-solved-v2', languageExercises.length);
+  const { solved, markSolved } = useSolvedExercises('automates-mpi-language-solved-v3', languageExercises.length);
   const exercise = languageExercises[exerciseId - 1];
 
   const restart = () => {
