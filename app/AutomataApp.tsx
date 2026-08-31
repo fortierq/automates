@@ -17,6 +17,7 @@ import {
   type Connection,
   type Edge,
   type EdgeProps,
+  type NodeProps,
   type NodeMouseHandler,
   type ReactFlowInstance,
 } from '@xyflow/react';
@@ -37,7 +38,7 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type StateData, type StateNode, useGraphStore } from './automataStore';
+import { type StateNode, useGraphStore } from './automataStore';
 
 type Section = 'language' | 'regex' | 'methods';
 type EdgeRouteData = {
@@ -54,18 +55,24 @@ type LanguageExerciseDefinition = {
   isFinal: (state: string) => boolean;
   transition: (state: string, symbol: string) => string;
 };
+type ExerciseDefinition = Pick<LanguageExerciseDefinition, 'id' | 'title' | 'prompt' | 'alphabet' | 'accepted' | 'rejected'>;
+type RegexExerciseDefinition = ExerciseDefinition & {
+  nodes: StateNode[];
+  edges: Edge[];
+  answer: string;
+};
 
 function MathText({ children }: { children: string }) {
   return <span className="math" dangerouslySetInnerHTML={{ __html: katex.renderToString(children, { throwOnError: false }) }} />;
 }
 
-function State({ data, selected }: { data: StateData; selected?: boolean }) {
+function State({ data, selected, isConnectable }: NodeProps<StateNode>) {
   return (
     <div className={`flow-state ${data.final ? 'is-final' : ''} ${selected ? 'is-selected' : ''}`}>
       {data.initial && <span className="initial-marker">→</span>}
-      <Handle type="target" position={Position.Left} />
+      <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
       <span>{data.label}</span>
-      <Handle type="source" position={Position.Right} />
+      <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
     </div>
   );
 }
@@ -167,6 +174,77 @@ const languageExercises: LanguageExerciseDefinition[] = [
   { id: 15, title: 'Congruence croisée modulo cinq', prompt: 'Reconnaître les mots tels que le nombre de a soit congru au double du nombre de b modulo cinq.', alphabet: alphabetAB, accepted: ['', 'aab', 'bbbbb', 'aaaaa'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0', isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : 3)) % 5) },
 ];
 
+const exerciseNode = (id: string, x: number, y: number, initial = false, final = false): StateNode => ({
+  id,
+  type: 'state',
+  position: { x, y },
+  data: { label: id.slice(1), initial, final },
+});
+const exerciseEdge = (id: string, source: string, target: string, label: string): Edge => ({ id, source, target, label, type: 'automaton' });
+
+const regexExercises: RegexExerciseDefinition[] = [
+  {
+    id: 1, title: 'Une seule lettre', prompt: 'Donner une expression régulière équivalente à cet automate.', alphabet: alphabetAB,
+    accepted: ['a'], rejected: ['', 'b', 'aa'], answer: 'a',
+    nodes: [exerciseNode('q0', 180, 210, true), exerciseNode('q1', 450, 210, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q1', 'a')],
+  },
+  {
+    id: 2, title: 'Choisir une lettre', prompt: 'L’automate accepte exactement les mots d’une lettre.', alphabet: alphabetAB,
+    accepted: ['a', 'b'], rejected: ['', 'ab', 'aa'], answer: 'a|b',
+    nodes: [exerciseNode('q0', 180, 210, true), exerciseNode('q1', 450, 210, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q1', 'a, b')],
+  },
+  {
+    id: 3, title: 'Deux lettres successives', prompt: 'Lire la concaténation imposée par cette chaîne d’états.', alphabet: alphabetAB,
+    accepted: ['ab'], rejected: ['', 'a', 'ba', 'abb'], answer: 'ab',
+    nodes: [exerciseNode('q0', 100, 210, true), exerciseNode('q1', 360, 210), exerciseNode('q2', 620, 210, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q1', 'q2', 'b')],
+  },
+  {
+    id: 4, title: 'Répéter librement', prompt: 'Traduire une boucle sur un état à la fois initial et final.', alphabet: alphabetAB,
+    accepted: ['', 'a', 'aa', 'aaaa'], rejected: ['b', 'ab'], answer: 'a*',
+    nodes: [exerciseNode('q0', 360, 230, true, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', 'a')],
+  },
+  {
+    id: 5, title: 'Blocs alternatifs', prompt: 'Chaque retour à l’état initial termine un bloc autorisé.', alphabet: alphabetAB,
+    accepted: ['', 'ab', 'ba', 'abba', 'baab'], rejected: ['a', 'b', 'aa', 'abb'], answer: '(ab|ba)*',
+    nodes: [exerciseNode('q0', 150, 230, true, true), exerciseNode('q1', 470, 120), exerciseNode('q2', 470, 340)],
+    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q1', 'q0', 'b'), exerciseEdge('e2', 'q0', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q0', 'a')],
+  },
+  {
+    id: 6, title: 'Se terminer par b', prompt: 'Les préfixes sont libres, mais la dernière lettre décide de l’acceptation.', alphabet: alphabetAB,
+    accepted: ['b', 'ab', 'aabb'], rejected: ['', 'a', 'bba'], answer: '(a|b)*b',
+    nodes: [exerciseNode('q0', 190, 220, true), exerciseNode('q1', 500, 220, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', 'a'), exerciseEdge('e1', 'q0', 'q1', 'b'), exerciseEdge('e2', 'q1', 'q0', 'a'), exerciseEdge('e3', 'q1', 'q1', 'b')],
+  },
+  {
+    id: 7, title: 'Contenir le facteur ab', prompt: 'Repérer la branche qui devine le début du facteur recherché.', alphabet: alphabetAB,
+    accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], answer: '(a|b)*ab(a|b)*',
+    nodes: [exerciseNode('q0', 100, 220, true), exerciseNode('q1', 360, 220), exerciseNode('q2', 620, 220, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', 'a, b'), exerciseEdge('e1', 'q0', 'q1', 'a'), exerciseEdge('e2', 'q1', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q2', 'a, b')],
+  },
+  {
+    id: 8, title: 'Jamais deux 1 consécutifs', prompt: 'L’absence d’une transition interdit le facteur 11.', alphabet: ['0', '1'],
+    accepted: ['', '0', '1', '10101'], rejected: ['11', '011', '110'], answer: '(0|10)*(ε|1)',
+    nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', '0'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q0', '0')],
+  },
+  {
+    id: 9, title: 'Un nombre pair de 0', prompt: 'Chaque lecture de 0 change la parité mémorisée par l’automate.', alphabet: ['0', '1'],
+    accepted: ['', '1', '00', '10101'], rejected: ['0', '10', '000'], answer: '1*(01*01*)*',
+    nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', '1'), exerciseEdge('e1', 'q0', 'q1', '0'), exerciseEdge('e2', 'q1', 'q0', '0'), exerciseEdge('e3', 'q1', 'q1', '1')],
+  },
+  {
+    id: 10, title: 'Compter les a modulo trois', prompt: 'Les lettres b et c sont neutres ; trois lectures de a ramènent à l’état final.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'bbb', 'aaa', 'abacac'], rejected: ['a', 'aa', 'abca'], answer: '(b|c)*(a(b|c)*a(b|c)*a(b|c)*)*',
+    nodes: [exerciseNode('q0', 110, 220, true, true), exerciseNode('q1', 360, 100), exerciseNode('q2', 610, 220)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', 'b, c'), exerciseEdge('e1', 'q1', 'q1', 'b, c'), exerciseEdge('e2', 'q2', 'q2', 'b, c'), exerciseEdge('e3', 'q0', 'q1', 'a'), exerciseEdge('e4', 'q1', 'q2', 'a'), exerciseEdge('e5', 'q2', 'q0', 'a')],
+  },
+];
+
 function compareLanguage(nodes: StateNode[], edges: Edge[], exercise: LanguageExerciseDefinition) {
   const initialStates = nodes.filter((node) => node.data.initial).map((node) => node.id).sort();
   const queue = [{ states: initialStates, targetState: exercise.initial, word: '' }];
@@ -243,7 +321,7 @@ const star = (inner: RegexAst): RegexAst => inner.kind === 'empty' || inner.kind
 
 class RegexParser {
   private index = 0;
-  constructor(private readonly source: string) {}
+  constructor(private readonly source: string, private readonly alphabet: Set<string>) {}
   parse() {
     const result = this.parseUnion();
     if (this.index !== this.source.length) throw new Error('Expression mal formée.');
@@ -279,7 +357,7 @@ class RegexParser {
     }
     if (token === 'ε') return epsilon;
     if (token === '∅') return empty;
-    if (token === 'a' || token === 'b') return { kind: 'literal', value: token };
+    if (token && this.alphabet.has(token)) return { kind: 'literal', value: token };
     throw new Error(`Symbole « ${token ?? ''} » non reconnu.`);
   }
 }
@@ -303,13 +381,13 @@ const derivative = (ast: RegexAst, symbol: string): RegexAst => {
   return union(...terms);
 };
 
-function parseRegex(source: string) {
-  const normalized = source.replaceAll(/\s|·/g, '').replaceAll('+', '|');
+function parseRegex(source: string, alphabet: string[]) {
+  const normalized = source.replaceAll('\\varepsilon', 'ε').replaceAll(/\s|·/g, '').replaceAll('+', '|');
   if (!normalized) throw new Error('Saisissez une expression.');
-  return new RegexParser(normalized).parse();
+  return new RegexParser(normalized, new Set(alphabet)).parse();
 }
 
-function compareRegex(left: RegexAst, right: RegexAst) {
+function compareRegex(left: RegexAst, right: RegexAst, alphabet: string[]) {
   const queue: Array<[RegexAst, RegexAst, string]> = [[left, right, '']];
   const seen = new Set<string>();
   while (queue.length) {
@@ -319,16 +397,100 @@ function compareRegex(left: RegexAst, right: RegexAst) {
     seen.add(pairKey);
     if (nullable(a) !== nullable(b)) return { equivalent: false, word, leftAccepts: nullable(a) };
     if (seen.size > 1000) throw new Error('Expression trop complexe pour une correction instantanée.');
-    ['a', 'b'].forEach((symbol) => queue.push([derivative(a, symbol), derivative(b, symbol), word + symbol]));
+    alphabet.forEach((symbol) => queue.push([derivative(a, symbol), derivative(b, symbol), word + symbol]));
   }
   return { equivalent: true };
+}
+
+function useRoutedEdges(edges: Edge[], selectedEdgeId: string | null = null) {
+  return useMemo(() => edges.map((edge) => {
+    const siblings = edges.filter((item) => item.source === edge.source && item.target === edge.target);
+    const index = siblings.findIndex((item) => item.id === edge.id);
+    const hasReverse = edge.source !== edge.target && edges.some((item) => item.source === edge.target && item.target === edge.source);
+    const routeOffset = edge.source === edge.target
+      ? index * 40
+      : hasReverse
+        ? 56 + index * 40
+        : (index - (siblings.length - 1) / 2) * 64;
+    return {
+      ...edge,
+      type: 'automaton',
+      selected: edge.id === selectedEdgeId,
+      markerEnd: { type: MarkerType.ArrowClosed, color: edge.id === selectedEdgeId ? '#246b49' : '#33423a' },
+      data: { ...edge.data, routeOffset },
+    };
+  }), [edges, selectedEdgeId]);
+}
+
+function useSolvedExercises(storageKey: string, count: number) {
+  const [solved, setSolved] = useState<number[]>([]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey) ?? '[]');
+        if (Array.isArray(saved)) setSolved([...new Set(saved.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= count))]);
+      } catch { /* Une progression invalide est simplement ignorée. */ }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [count, storageKey]);
+  const markSolved = useCallback((id: number) => {
+    setSolved((current) => {
+      if (current.includes(id)) return current;
+      const next = [...current, id].sort((a, b) => a - b);
+      localStorage.setItem(storageKey, JSON.stringify(next));
+      return next;
+    });
+  }, [storageKey]);
+  return { solved, markSolved };
+}
+
+const showWord = (word: string) => word ? <MathText>{word.replaceAll('#', '\\#')}</MathText> : <MathText>{'\\varepsilon'}</MathText>;
+
+function ExercisePicker({ current, exercises, solved, onSelect, id }: { current: ExerciseDefinition; exercises: ExerciseDefinition[]; solved: number[]; onSelect: (id: number) => void; id: string }) {
+  const [open, setOpen] = useState(false);
+  return <div className="exercise-picker" onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }}>
+    <button id={id} className={`exercise-picker-trigger ${solved.includes(current.id) ? 'is-solved' : ''}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>{String(current.id).padStart(2, '0')} — {current.title}</span><ChevronDown /></button>
+    {open && <div className="exercise-picker-menu" role="listbox" aria-label="Choisir un exercice">{exercises.map((item) => <button key={item.id} role="option" aria-selected={item.id === current.id} className={`${solved.includes(item.id) ? 'is-solved' : ''} ${item.id === current.id ? 'is-current' : ''}`} onClick={() => { setOpen(false); onSelect(item.id); }}><span>{String(item.id).padStart(2, '0')}</span>{item.title}</button>)}</div>}
+  </div>;
+}
+
+function ExerciseData({ exercise }: { exercise: ExerciseDefinition }) {
+  return <div className="language-data"><section><strong>Alphabet</strong><div className="math-chips">{exercise.alphabet.map((symbol) => <span className="math-chip" key={symbol}>{showWord(symbol)}</span>)}</div></section><section><strong>Exemples de mots</strong><div className="example-row"><span>Acceptés</span><div className="math-chips">{exercise.accepted.map((word, index) => <span className="math-chip accepted" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div><div className="example-row"><span>Refusés</span><div className="math-chips">{exercise.rejected.map((word, index) => <span className="math-chip rejected" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div></section></div>;
+}
+
+function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRestart, onCheck, children, pickerId, checkLabel = 'Vérifier' }: { exercise: ExerciseDefinition; exercises: ExerciseDefinition[]; solved: number[]; feedback: { ok: boolean; text: string } | null; onSelect: (id: number) => void; onRestart: () => void; onCheck: () => void; children?: React.ReactNode; pickerId: string; checkLabel?: string }) {
+  return <section className="exercise-task">
+    <label htmlFor={pickerId}>Exercice</label>
+    <ExercisePicker id={pickerId} current={exercise} exercises={exercises} solved={solved} onSelect={onSelect} />
+    <h2>{exercise.title}</h2>
+    <p>{exercise.prompt}</p>
+    <ExerciseData exercise={exercise} />
+    {children}
+    {feedback && <Feedback {...feedback} />}
+    <div className="exercise-buttons"><button className="ghost-button" onClick={onRestart}><RotateCcw /> Recommencer</button><button className="primary" onClick={onCheck}><Check /> {checkLabel}</button><button className="ghost-button next-exercise" disabled={exercise.id === exercises.length} onClick={() => onSelect(exercise.id + 1)}>Exercice suivant <ArrowRight /></button></div>
+  </section>;
+}
+
+function Workspace({ sidebar, footer, canvasClassName = '', children }: { sidebar: React.ReactNode; footer?: React.ReactNode; canvasClassName?: string; children: React.ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  return <section className="workspace">
+    <section className={`canvas-wrap ${canvasClassName}`} aria-label="Plan de travail de l’automate">
+      <button className="sidebar-toggle" aria-controls="editor-sidebar" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Menu /><span>Ouvrir le panneau</span></button>
+      {children}
+    </section>
+    <button className={`sidebar-backdrop ${sidebarOpen ? 'is-visible' : ''}`} aria-label="Fermer le panneau" onClick={() => setSidebarOpen(false)} />
+    <aside id="editor-sidebar" className={`side-panel ${sidebarOpen ? 'is-open' : ''}`}>
+      <button className="sidebar-close" aria-label="Fermer le panneau" onClick={() => setSidebarOpen(false)}><X /></button>
+      {sidebar}
+      {footer}
+    </aside>
+  </section>;
 }
 
 function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: React.ReactNode; defaultSymbol?: string }) {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notice, setNotice] = useState('Enregistré localement');
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
 
@@ -351,26 +513,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
-  const routedEdges = useMemo(() => edges.map((edge) => {
-    const siblings = edges.filter((item) => item.source === edge.source && item.target === edge.target);
-    const index = siblings.findIndex((item) => item.id === edge.id);
-    const hasReverse = edge.source !== edge.target && edges.some((item) => item.source === edge.target && item.target === edge.source);
-    const routeOffset = edge.source === edge.target
-      ? index * 40
-      : hasReverse
-        ? 56 + index * 40
-        : (index - (siblings.length - 1) / 2) * 64;
-    return {
-      ...edge,
-      type: 'automaton',
-      selected: edge.id === selectedEdgeId,
-      markerEnd: { type: MarkerType.ArrowClosed, color: edge.id === selectedEdgeId ? '#246b49' : '#33423a' },
-      data: {
-        ...edge.data,
-        routeOffset,
-      },
-    };
-  }), [edges, selectedEdgeId]);
+  const routedEdges = useRoutedEdges(edges, selectedEdgeId);
   const copyLatex = async () => {
     await navigator.clipboard.writeText(toLatex(nodes, edges));
     setNotice('LaTeX copié');
@@ -386,10 +529,32 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
     URL.revokeObjectURL(url);
   };
 
-  return (
-    <section className="workspace">
-      <section className="canvas-wrap" aria-label="Plan de travail de l’automate">
-        <button className="sidebar-toggle" aria-controls="editor-sidebar" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><Menu /><span>Ouvrir le panneau</span></button>
+  const sidebar = <>
+    {sidebarContent}
+    <div className={sidebarContent ? 'sidebar-properties' : ''}>
+      {selectedNode ? (
+        <div className="properties-form">
+          <span className="eyebrow">État sélectionné</span>
+          <label htmlFor="state-label">Nom</label>
+          <input id="state-label" className="text-input mono" value={selectedNode.data.label} onChange={(event) => setNodes(nodes.map((node) => node.id === selectedNode.id ? { ...node, data: { ...node.data, label: event.target.value } } : node))} />
+          <label className="check-row"><input type="checkbox" checked={!!selectedNode.data.initial} onChange={() => toggleNode(selectedNode.id, 'initial')} /><span>État initial</span></label>
+          <label className="check-row"><input type="checkbox" checked={!!selectedNode.data.final} onChange={() => toggleNode(selectedNode.id, 'final')} /><span>État final</span></label>
+          <button className="danger-link" onClick={() => { setNodes(nodes.filter((node) => node.id !== selectedNode.id)); setEdges(edges.filter((edge) => edge.source !== selectedNode.id && edge.target !== selectedNode.id)); setSelectedNodeId(null); }}><Trash2 /> Supprimer l’état</button>
+        </div>
+      ) : selectedEdge ? (
+        <div className="properties-form">
+          <span className="eyebrow">Transition sélectionnée</span>
+          <label htmlFor="edge-label">Lettres (séparées par des virgules)</label>
+          <input id="edge-label" className="text-input mono" autoFocus value={String(selectedEdge.label ?? '')} onChange={(event) => setEdges(edges.map((edge) => edge.id === selectedEdge.id ? { ...edge, label: event.target.value } : edge))} />
+          <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
+          <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
+        </div>
+      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état, puis reliez ses poignées pour créer une transition.</p></div>}
+    </div>
+  </>;
+  const footer = <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger LaTeX"><Download /></button></div>;
+
+  return <Workspace sidebar={sidebar} footer={footer}>
         <div className="canvas-status"><span>{notice}</span></div>
         <ReactFlow<StateNode, Edge>
           nodes={nodes.map((node) => ({ ...node, selected: node.id === selectedNodeId }))}
@@ -410,56 +575,15 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cdd6ce" />
           <Controls showInteractive={false} position="top-right" />
         </ReactFlow>
-      </section>
-
-      <button className={`sidebar-backdrop ${sidebarOpen ? 'is-visible' : ''}`} aria-label="Fermer le panneau" onClick={() => setSidebarOpen(false)} />
-      <aside id="editor-sidebar" className={`side-panel ${sidebarOpen ? 'is-open' : ''}`}>
-        <button className="sidebar-close" aria-label="Fermer le panneau" onClick={() => setSidebarOpen(false)}><X /></button>
-        {sidebarContent}
-        <div className={sidebarContent ? 'sidebar-properties' : ''}>
-          {selectedNode ? (
-            <div className="properties-form">
-              <span className="eyebrow">État sélectionné</span>
-              <label htmlFor="state-label">Nom</label>
-              <input id="state-label" className="text-input mono" value={selectedNode.data.label} onChange={(event) => setNodes(nodes.map((node) => node.id === selectedNode.id ? { ...node, data: { ...node.data, label: event.target.value } } : node))} />
-              <label className="check-row"><input type="checkbox" checked={!!selectedNode.data.initial} onChange={() => toggleNode(selectedNode.id, 'initial')} /><span>État initial</span></label>
-              <label className="check-row"><input type="checkbox" checked={!!selectedNode.data.final} onChange={() => toggleNode(selectedNode.id, 'final')} /><span>État final</span></label>
-              <button className="danger-link" onClick={() => { setNodes(nodes.filter((node) => node.id !== selectedNode.id)); setEdges(edges.filter((edge) => edge.source !== selectedNode.id && edge.target !== selectedNode.id)); setSelectedNodeId(null); }}><Trash2 /> Supprimer l’état</button>
-            </div>
-          ) : selectedEdge ? (
-            <div className="properties-form">
-              <span className="eyebrow">Transition sélectionnée</span>
-              <label htmlFor="edge-label">Lettres (séparées par des virgules)</label>
-              <input id="edge-label" className="text-input mono" autoFocus value={String(selectedEdge.label ?? '')} onChange={(event) => setEdges(edges.map((edge) => edge.id === selectedEdge.id ? { ...edge, label: event.target.value } : edge))} />
-              <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
-              <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
-            </div>
-          ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état, puis reliez ses poignées pour créer une transition.</p></div>}
-        </div>
-        <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier le LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger le fichier LaTeX"><Download /></button></div>
-      </aside>
-
-    </section>
-  );
+  </Workspace>;
 }
 
 function LanguageExercise() {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [exerciseId, setExerciseId] = useState(1);
-  const [exerciseMenuOpen, setExerciseMenuOpen] = useState(false);
-  const [solved, setSolved] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const { solved, markSolved } = useSolvedExercises('automates-mpi-language-solved', languageExercises.length);
   const exercise = languageExercises[exerciseId - 1];
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      try {
-        const saved = JSON.parse(localStorage.getItem('automates-mpi-language-solved') ?? '[]');
-        if (Array.isArray(saved)) setSolved([...new Set(saved.filter((id): id is number => Number.isInteger(id) && id >= 1 && id <= languageExercises.length))]);
-      } catch { /* Une progression invalide est simplement ignorée. */ }
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const restart = () => {
     setNodes([{ id: 'q0', type: 'state', position: { x: 180, y: 200 }, data: { label: '0', initial: true } }]);
@@ -469,7 +593,6 @@ function LanguageExercise() {
 
   const selectExercise = (id: number) => {
     setExerciseId(id);
-    setExerciseMenuOpen(false);
     restart();
   };
 
@@ -477,11 +600,7 @@ function LanguageExercise() {
     const result = compareLanguage(nodes, edges, exercise);
     if (result.equivalent) {
       setFeedback({ ok: true, text: 'Correct : les deux langages sont égaux.' });
-      if (!solved.includes(exercise.id)) {
-        const next = [...solved, exercise.id].sort((a, b) => a - b);
-        setSolved(next);
-        localStorage.setItem('automates-mpi-language-solved', JSON.stringify(next));
-      }
+      markSolved(exercise.id);
       return;
     }
     const word = result.word || 'ε';
@@ -490,43 +609,70 @@ function LanguageExercise() {
       text: `Contre-exemple : « ${word} » est ${result.studentAccepts ? 'accepté par votre automate, mais pas par le langage demandé' : 'refusé par votre automate, mais appartient au langage demandé'}.`,
     });
   };
-  const showWord = (word: string) => word ? <MathText>{word.replaceAll('#', '\\#')}</MathText> : <MathText>{'\\varepsilon'}</MathText>;
-  return <Editor defaultSymbol={exercise.alphabet[0]} sidebarContent={<section className="language-task">
-    <label htmlFor="language-exercise">Exercice</label>
-    <div className="exercise-picker" onKeyDown={(event) => { if (event.key === 'Escape') setExerciseMenuOpen(false); }}>
-      <button id="language-exercise" className={`exercise-picker-trigger ${solved.includes(exercise.id) ? 'is-solved' : ''}`} aria-haspopup="listbox" aria-expanded={exerciseMenuOpen} onClick={() => setExerciseMenuOpen((open) => !open)}><span>{String(exercise.id).padStart(2, '0')} — {exercise.title}</span><ChevronDown /></button>
-      {exerciseMenuOpen && <div className="exercise-picker-menu" role="listbox" aria-label="Choisir un exercice">{languageExercises.map((item) => <button key={item.id} role="option" aria-selected={item.id === exercise.id} className={`${solved.includes(item.id) ? 'is-solved' : ''} ${item.id === exercise.id ? 'is-current' : ''}`} onClick={() => selectExercise(item.id)}><span>{String(item.id).padStart(2, '0')}</span>{item.title}</button>)}</div>}
-    </div>
-    <h2>{exercise.title}</h2>
-    <p>{exercise.prompt}</p>
-    <div className="language-data"><section><strong>Alphabet</strong><div className="math-chips">{exercise.alphabet.map((symbol) => <span className="math-chip" key={symbol}>{showWord(symbol)}</span>)}</div></section><section><strong>Exemples de mots</strong><div className="example-row"><span>Acceptés</span><div className="math-chips">{exercise.accepted.map((word, index) => <span className="math-chip accepted" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div><div className="example-row"><span>Refusés</span><div className="math-chips">{exercise.rejected.map((word, index) => <span className="math-chip rejected" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div></section></div>
-    {feedback && <Feedback {...feedback} />}
-    <div className="exercise-buttons"><button className="ghost-button" onClick={restart}><RotateCcw /> Recommencer</button><button className="primary" onClick={check}><Check /> Vérifier</button><button className="ghost-button next-exercise" disabled={exerciseId === languageExercises.length} onClick={() => selectExercise(exerciseId + 1)}>Exercice suivant <ArrowRight /></button></div>
-  </section>} />;
+  return <Editor defaultSymbol={exercise.alphabet[0]} sidebarContent={<ExercisePanel exercise={exercise} exercises={languageExercises} solved={solved} feedback={feedback} onSelect={selectExercise} onRestart={restart} onCheck={check} pickerId="language-exercise" />} />;
 }
 
 function RegexExercise() {
+  const [exerciseId, setExerciseId] = useState(1);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [regex, setRegex] = useState('');
+  const { solved, markSolved } = useSolvedExercises('automates-mpi-regex-solved', regexExercises.length);
+  const exercise = regexExercises[exerciseId - 1];
+  const routedEdges = useRoutedEdges(exercise.edges);
+
+  const restart = () => {
+    setRegex('');
+    setFeedback(null);
+  };
+  const selectExercise = (id: number) => {
+    setExerciseId(id);
+    setRegex('');
+    setFeedback(null);
+  };
   const check = () => {
     try {
-      const result = compareRegex(parseRegex(regex), parseRegex('ab'));
+      const result = compareRegex(parseRegex(regex, exercise.alphabet), parseRegex(exercise.answer, exercise.alphabet), exercise.alphabet);
       const word = result.equivalent ? '' : result.word || 'ε';
-      setFeedback(result.equivalent
-        ? { ok: true, text: 'Correct.' }
-        : { ok: false, text: `Contre-exemple : « ${word} » est ${result.leftAccepts ? 'accepté par votre expression, mais refusé par l’automate' : 'refusé par votre expression, mais accepté par l’automate'}.` });
+      if (result.equivalent) {
+        setFeedback({ ok: true, text: 'Correct : votre expression reconnaît exactement le langage de l’automate.' });
+        markSolved(exercise.id);
+      } else {
+        setFeedback({ ok: false, text: `Contre-exemple : « ${word} » est ${result.leftAccepts ? 'accepté par votre expression, mais refusé par l’automate' : 'refusé par votre expression, mais accepté par l’automate'}.` });
+      }
     } catch (error) {
       setFeedback({ ok: false, text: error instanceof Error ? error.message : 'Expression non reconnue.' });
     }
   };
-  return <ExerciseLayout title="Retrouver une expression régulière équivalente." progress="Automate → expression">
-    <article className="prompt-card"><span className="number">02</span><span className="difficulty">Essentiel</span><h2>Donner une expression régulière</h2><p>L’automate lit <MathText>a</MathText> de <MathText>{'q_0'}</MathText> à <MathText>{'q_1'}</MathText>, puis <MathText>b</MathText> pour atteindre l’unique état final <MathText>{'q_2'}</MathText>.</p><div className="mini-automaton three"><span className="mini-node initial"><MathText>{'q_0'}</MathText></span><span className="mini-edge"><MathText>a</MathText> →</span><span className="mini-node"><MathText>{'q_1'}</MathText></span><span className="mini-edge"><MathText>b</MathText> →</span><span className="mini-node final"><MathText>{'q_2'}</MathText></span></div></article>
-    <article className="answer-card"><label htmlFor="regex">Votre expression</label><input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} placeholder="Ex. (a|a)b" /><p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>{'\\varepsilon'}</MathText> et parenthèses. La correction compare les langages, pas le texte.</p><button className="outline-button" onClick={check}><Check /> Vérifier l’expression</button>{feedback && <Feedback {...feedback} />}</article>
-  </ExerciseLayout>;
-}
-
-function ExerciseLayout({ title, progress, children }: { title: string; progress: string; children: React.ReactNode }) {
-  return <section className="exercise-page"><div className="exercise-head"><div><span className="eyebrow">Entraînement guidé</span><h1>{title}</h1></div><div className="progress-pill">{progress}</div></div><div className="exercise-grid">{children}</div></section>;
+  const sidebar = <ExercisePanel exercise={exercise} exercises={regexExercises} solved={solved} feedback={feedback} onSelect={selectExercise} onRestart={restart} onCheck={check} pickerId="regex-exercise" checkLabel="Vérifier">
+    <div className="regex-answer">
+      <label htmlFor="regex">Votre expression</label>
+      <input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} onKeyDown={(event) => { if (event.key === 'Enter') check(); }} placeholder="Ex. (a|b)*ab" />
+      <p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>{'\\varepsilon'}</MathText> et parenthèses.</p>
+    </div>
+  </ExercisePanel>;
+  return <Workspace sidebar={sidebar} canvasClassName="readonly-canvas">
+    <div className="canvas-status"><span>Automate en lecture seule</span></div>
+    <ReactFlow<StateNode, Edge>
+      key={exercise.id}
+      nodes={exercise.nodes}
+      edges={routedEdges}
+      nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
+      nodesDraggable={false}
+      nodesConnectable={false}
+      nodesFocusable={false}
+      edgesFocusable={false}
+      elementsSelectable={false}
+      zoomOnDoubleClick={false}
+      fitView
+      fitViewOptions={{ padding: 0.28 }}
+      minZoom={0.4}
+      maxZoom={1.8}
+    >
+      <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cdd6ce" />
+      <Controls showInteractive={false} position="top-right" />
+    </ReactFlow>
+  </Workspace>;
 }
 
 function Feedback({ ok, text }: { ok: boolean; text: string }) {
