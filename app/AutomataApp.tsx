@@ -30,6 +30,7 @@ import {
   ChevronDown,
   Clipboard,
   Download,
+  Github,
   Menu,
   MousePointer2,
   RotateCcw,
@@ -848,6 +849,10 @@ export default function AutomataApp() {
         <header className="topbar">
           <button className="brand-button" onClick={() => setSection('language')}><span className="brand-mark">A</span><span className="brand-copy"><strong>Automates</strong><span>MP · MPI</span></span></button>
           <nav aria-label="Sections principales">{nav.map(([id, label]) => <button key={id} className={`nav-item ${section === id ? 'active' : ''}`} onClick={() => setSection(id)}>{label}</button>)}</nav>
+          <div className="topbar-actions">
+            <a href="https://mpi-lamartin.github.io/mpi-info" target="_blank" rel="noreferrer">MPI</a>
+            <a className="icon-link" href="https://github.com/fortierq/automates" target="_blank" rel="noreferrer" aria-label="Code source sur GitHub"><Github /></a>
+          </div>
         </header>
         {section === 'language' && <LanguageExercise />}
         {section === 'language-regex' && <LanguageRegexExercise />}
