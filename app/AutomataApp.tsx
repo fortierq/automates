@@ -39,7 +39,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type StateNode, useGraphStore } from './automataStore';
 
-type Section = 'language' | 'regex';
+type Section = 'language' | 'language-regex' | 'regex';
 type EdgeRouteData = {
   routeOffset?: number;
 };
@@ -173,6 +173,69 @@ const languageExercises: LanguageExerciseDefinition[] = [
   { id: 15, title: 'Congruence croisée modulo cinq', prompt: 'Reconnaître les mots tels que le nombre de a soit congru au double du nombre de b modulo cinq.', alphabet: alphabetAB, accepted: ['', 'aab', 'bbbbb', 'aaaaa'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0', isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : 3)) % 5) },
 ];
 
+const languageRegexExercises: LanguageExerciseDefinition[] = [
+  {
+    id: 1, title: 'Une seule occurrence de ab', prompt: 'Les mots contiennent exactement une occurrence du facteur ab.', alphabet: alphabetAB,
+    accepted: ['ab', 'aab', 'abba', 'baba'], rejected: ['', 'a', 'bb', 'abab'], initial: '0:0',
+    isFinal: (state) => state.startsWith('1:'),
+    transition: (state, symbol) => { const [count, lastA] = state.split(':').map(Number); return `${Math.min(2, count + (lastA && symbol === 'b' ? 1 : 0))}:${symbol === 'a' ? 1 : 0}`; },
+  },
+  {
+    id: 2, title: 'Un c toutes les trois lettres', prompt: 'Chaque lettre dont la position est un multiple de trois est un c. Les positions commencent à 1.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'a', 'cc', 'aac', 'abcaac'], rejected: ['aaa', 'abb', 'abcaba'], initial: '0',
+    isFinal: (state) => state !== 'dead',
+    transition: (state, symbol) => state === 'dead' || (state === '2' && symbol !== 'c') ? 'dead' : String((Number(state) + 1) % 3),
+  },
+  {
+    id: 3, title: 'Terminer par 0 sans 111', prompt: 'Les mots binaires se terminent par 0 et ne contiennent jamais le facteur 111.', alphabet: ['0', '1'],
+    accepted: ['0', '10', '110', '1010'], rejected: ['', '1', '1110', '1101'], initial: 'start',
+    isFinal: (state) => state === 'zero',
+    transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (symbol === '0') return 'zero'; if (state === 'one2') return 'dead'; return state === 'one1' ? 'one2' : 'one1'; },
+  },
+  {
+    id: 4, title: 'Lettres à compléter', prompt: 'Chaque b est immédiatement suivi d’un a, et chaque c est immédiatement suivi de ba.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'a', 'ba', 'cba', 'bacba'], rejected: ['b', 'cb', 'caa', 'bb'], initial: 'ready',
+    isFinal: (state) => state === 'ready',
+    transition: (state, symbol) => { if (state === 'ready') return symbol === 'a' ? 'ready' : symbol === 'b' ? 'need-a' : 'need-b'; if (state === 'need-b') return symbol === 'b' ? 'need-a' : 'dead'; if (state === 'need-a') return symbol === 'a' ? 'ready' : 'dead'; return 'dead'; },
+  },
+  {
+    id: 5, title: 'Deux séparateurs espacés', prompt: 'Les mots contiennent exactement deux #, séparés par au moins un bit.', alphabet: ['0', '1', '#'],
+    accepted: ['#0#', '1#1#0', '#01#11'], rejected: ['', '##', '#0', '#0#1#'], initial: 'before',
+    isFinal: (state) => state === 'after',
+    transition: (state, symbol) => { if (state === 'before') return symbol === '#' ? 'gap-empty' : 'before'; if (state === 'gap-empty') return symbol === '#' ? 'dead' : 'gap'; if (state === 'gap') return symbol === '#' ? 'after' : 'gap'; if (state === 'after') return symbol === '#' ? 'dead' : 'after'; return 'dead'; },
+  },
+  {
+    id: 6, title: 'Écart impair entre les b', prompt: 'Entre deux b consécutifs, le nombre de a est toujours impair.', alphabet: alphabetAB,
+    accepted: ['', 'b', 'aba', 'bab', 'baaab'], rejected: ['bb', 'baab', 'bababb'], initial: 'none',
+    isFinal: (state) => state !== 'dead',
+    transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'none') return symbol === 'b' ? 'even' : 'none'; if (symbol === 'a') return state === 'even' ? 'odd' : 'even'; return state === 'odd' ? 'even' : 'dead'; },
+  },
+  {
+    id: 7, title: 'Deux parités de blocs', prompt: 'Chaque bloc maximal de a est de longueur paire, tandis que chaque bloc maximal de b est de longueur impaire.', alphabet: alphabetAB,
+    accepted: ['', 'aa', 'b', 'aabbb', 'baab'], rejected: ['a', 'bb', 'abb', 'aabb'], initial: 'start',
+    isFinal: (state) => state === 'start' || state === 'a-even' || state === 'b-odd',
+    transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'start') return symbol === 'a' ? 'a-odd' : 'b-odd'; if (state === 'a-odd') return symbol === 'a' ? 'a-even' : 'dead'; if (state === 'a-even') return symbol === 'a' ? 'a-odd' : 'b-odd'; if (state === 'b-odd') return symbol === 'b' ? 'b-even' : 'a-odd'; return symbol === 'b' ? 'b-odd' : 'dead'; },
+  },
+  {
+    id: 8, title: 'Alphabet autorisé après #', prompt: 'Il y a exactement un #. Après celui-ci, seules des lettres déjà apparues avant # peuvent être utilisées.', alphabet: ['0', '1', '#'],
+    accepted: ['#', '0#', '01#100', '10#111'], rejected: ['', '#0', '0#1', '0#0#'], initial: 'pre:0',
+    isFinal: (state) => state.startsWith('post:'),
+    transition: (state, symbol) => { if (state === 'dead') return 'dead'; const [side, rawMask] = state.split(':'); const mask = Number(rawMask); if (side === 'pre') { if (symbol === '#') return `post:${mask}`; return `pre:${mask | (symbol === '0' ? 1 : 2)}`; } if (symbol === '#') return 'dead'; const bit = symbol === '0' ? 1 : 2; return mask & bit ? state : 'dead'; },
+  },
+  {
+    id: 9, title: 'Deux compteurs indépendants', prompt: 'Le nombre de a est multiple de trois et le nombre de b est pair. La lettre c est neutre.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'ccc', 'aaa', 'bb', 'aaabbc'], rejected: ['a', 'b', 'ab', 'aaab'], initial: '0:0',
+    isFinal: (state) => state === '0:0',
+    transition: (state, symbol) => { const [a, b] = state.split(':').map(Number); return symbol === 'a' ? `${(a + 1) % 3}:${b}` : symbol === 'b' ? `${a}:${1 - b}` : state; },
+  },
+  {
+    id: 10, title: 'Congruence croisée modulo cinq', prompt: 'Le nombre de a est congru au double du nombre de b modulo cinq. La lettre c est neutre.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'c', 'aab', 'bbbbb', 'aaaaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
+    isFinal: (state) => state === '0',
+    transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : symbol === 'b' ? 3 : 0)) % 5),
+  },
+];
+
 const exerciseNode = (id: string, x: number, y: number, initial = false, final = false): StateNode => ({
   id,
   type: 'state',
@@ -183,61 +246,61 @@ const exerciseEdge = (id: string, source: string, target: string, label: string)
 
 const regexExercises: RegexExerciseDefinition[] = [
   {
-    id: 1, title: 'Exactement un b', prompt: 'Les deux boucles autorisent des a avant et après l’unique b.', alphabet: alphabetAB,
+    id: 1, title: 'Automate 1', prompt: '', alphabet: alphabetAB,
     accepted: ['b', 'ab', 'baa'], rejected: ['', 'a', 'bb', 'bab'], answer: 'a*ba*',
     nodes: [exerciseNode('q0', 190, 220, true), exerciseNode('q1', 500, 220, false, true)],
     edges: [exerciseEdge('e0', 'q0', 'q0', 'a'), exerciseEdge('e1', 'q0', 'q1', 'b'), exerciseEdge('e2', 'q1', 'q1', 'a')],
   },
   {
-    id: 2, title: 'Chaque a appelle un b', prompt: 'Toute lettre a doit être immédiatement suivie d’un b.', alphabet: alphabetAB,
+    id: 2, title: 'Automate 2', prompt: '', alphabet: alphabetAB,
     accepted: ['', 'b', 'ab', 'babb'], rejected: ['a', 'aa', 'ba'], answer: '(b|ab)*',
     nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220)],
     edges: [exerciseEdge('e0', 'q0', 'q0', 'b'), exerciseEdge('e1', 'q0', 'q1', 'a'), exerciseEdge('e2', 'q1', 'q0', 'b')],
   },
   {
-    id: 3, title: 'Un a à chaque position paire', prompt: 'Les positions sont comptées à partir de 1 ; les positions impaires restent libres.', alphabet: alphabetAB,
+    id: 3, title: 'Automate 3', prompt: '', alphabet: alphabetAB,
     accepted: ['', 'a', 'b', 'aa', 'ba', 'aaba'], rejected: ['ab', 'bb', 'babb'], answer: '((a|b)a)*(ε|a|b)',
     nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220, false, true)],
     edges: [exerciseEdge('e0', 'q0', 'q1', 'a, b'), exerciseEdge('e1', 'q1', 'q0', 'a')],
   },
   {
-    id: 4, title: 'Même première et dernière lettre', prompt: 'L’automate mémorise la première lettre puis actualise seulement la dernière.', alphabet: alphabetAB,
+    id: 4, title: 'Automate 4', prompt: '', alphabet: alphabetAB,
     accepted: ['a', 'b', 'aa', 'aba', 'baab'], rejected: ['', 'ab', 'ba', 'abb'], answer: 'a((a|b)*a|ε)|b((a|b)*b|ε)',
     nodes: [exerciseNode('q0', 60, 230, true), exerciseNode('q1', 300, 90, false, true), exerciseNode('q2', 570, 90), exerciseNode('q3', 300, 350, false, true), exerciseNode('q4', 570, 350)],
     edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q0', 'q3', 'b'), exerciseEdge('e2', 'q1', 'q1', 'a'), exerciseEdge('e3', 'q1', 'q2', 'b'), exerciseEdge('e4', 'q2', 'q1', 'a'), exerciseEdge('e5', 'q2', 'q2', 'b'), exerciseEdge('e6', 'q3', 'q3', 'b'), exerciseEdge('e7', 'q3', 'q4', 'a'), exerciseEdge('e8', 'q4', 'q3', 'b'), exerciseEdge('e9', 'q4', 'q4', 'a')],
   },
   {
-    id: 5, title: 'Blocs de 1 de longueur paire', prompt: 'Un bloc de 1 ne peut être quitté ni terminer tant que sa longueur est impaire.', alphabet: ['0', '1'],
+    id: 5, title: 'Automate 5', prompt: '', alphabet: ['0', '1'],
     accepted: ['', '0', '11', '01100', '11011'], rejected: ['1', '10', '111', '101'], answer: '(0|11)*',
     nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220)],
     edges: [exerciseEdge('e0', 'q0', 'q0', '0'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q0', '1')],
   },
   {
-    id: 6, title: 'Lettres strictement alternées', prompt: 'Après la première lettre, une seule transition reste possible à chaque étape.', alphabet: alphabetAB,
+    id: 6, title: 'Automate 6', prompt: '', alphabet: alphabetAB,
     accepted: ['', 'a', 'b', 'ab', 'baba'], rejected: ['aa', 'bb', 'abb'], answer: '(ab)*(ε|a)|(ba)*(ε|b)',
     nodes: [exerciseNode('q0', 120, 220, true, true), exerciseNode('q1', 470, 100, false, true), exerciseNode('q2', 470, 340, false, true)],
     edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q0', 'q2', 'b'), exerciseEdge('e2', 'q1', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q1', 'a')],
   },
   {
-    id: 7, title: 'Le troisième bit en partant de la fin', prompt: 'La branche non déterministe choisit le 1 qui devra se retrouver en troisième position depuis la fin.', alphabet: ['0', '1'],
+    id: 7, title: 'Automate 7', prompt: '', alphabet: ['0', '1'],
     accepted: ['100', '101', '1110'], rejected: ['', '10', '010', '1000'], answer: '(0|1)*1(0|1)(0|1)',
     nodes: [exerciseNode('q0', 60, 220, true), exerciseNode('q1', 280, 220), exerciseNode('q2', 500, 220), exerciseNode('q3', 720, 220, false, true)],
     edges: [exerciseEdge('e0', 'q0', 'q0', '0, 1'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q2', '0, 1'), exerciseEdge('e3', 'q2', 'q3', '0, 1')],
   },
   {
-    id: 8, title: 'Deux parités simultanées', prompt: 'Reconnaître les mots ayant à la fois un nombre pair de a et un nombre pair de b.', alphabet: alphabetAB,
+    id: 8, title: 'Automate 8', prompt: '', alphabet: alphabetAB,
     accepted: ['', 'aa', 'bb', 'abba', 'abab'], rejected: ['a', 'b', 'ab', 'aab'], answer: '(aa|bb|(ab|ba)(aa|bb)*(ab|ba))*',
     nodes: [exerciseNode('q0', 180, 100, true, true), exerciseNode('q1', 500, 100), exerciseNode('q2', 180, 350), exerciseNode('q3', 500, 350)],
     edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q1', 'q0', 'a'), exerciseEdge('e2', 'q0', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q0', 'b'), exerciseEdge('e4', 'q1', 'q3', 'b'), exerciseEdge('e5', 'q3', 'q1', 'b'), exerciseEdge('e6', 'q2', 'q3', 'a'), exerciseEdge('e7', 'q3', 'q2', 'a')],
   },
   {
-    id: 9, title: 'Compter les a modulo trois', prompt: 'Les lettres b et c sont neutres ; trois lectures de a ramènent à l’état final.', alphabet: ['a', 'b', 'c'],
+    id: 9, title: 'Automate 9', prompt: '', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'bbb', 'aaa', 'abacac'], rejected: ['a', 'aa', 'abca'], answer: '(b|c)*(a(b|c)*a(b|c)*a(b|c)*)*',
     nodes: [exerciseNode('q0', 110, 220, true, true), exerciseNode('q1', 360, 100), exerciseNode('q2', 610, 220)],
     edges: [exerciseEdge('e0', 'q0', 'q0', 'b, c'), exerciseEdge('e1', 'q1', 'q1', 'b, c'), exerciseEdge('e2', 'q2', 'q2', 'b, c'), exerciseEdge('e3', 'q0', 'q1', 'a'), exerciseEdge('e4', 'q1', 'q2', 'a'), exerciseEdge('e5', 'q2', 'q0', 'a')],
   },
   {
-    id: 10, title: 'Multiples de trois en binaire', prompt: 'Les états mémorisent le reste modulo trois de la valeur binaire déjà lue.', alphabet: ['0', '1'],
+    id: 10, title: 'Automate 10', prompt: '', alphabet: ['0', '1'],
     accepted: ['', '0', '11', '110', '1001'], rejected: ['1', '10', '101', '111'], answer: '(0|1(01*0)*1)*',
     nodes: [exerciseNode('q0', 120, 220, true, true), exerciseNode('q1', 440, 90), exerciseNode('q2', 440, 350)],
     edges: [exerciseEdge('e0', 'q0', 'q0', '0'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q2', '0'), exerciseEdge('e3', 'q1', 'q0', '1'), exerciseEdge('e4', 'q2', 'q1', '0'), exerciseEdge('e5', 'q2', 'q2', '1')],
@@ -401,6 +464,22 @@ function compareRegex(left: RegexAst, right: RegexAst, alphabet: string[]) {
   return { equivalent: true };
 }
 
+function compareRegexToLanguage(candidate: RegexAst, exercise: LanguageExerciseDefinition) {
+  const queue: Array<[RegexAst, string, string]> = [[candidate, exercise.initial, '']];
+  const seen = new Set<string>();
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const [expression, state, word] = queue[cursor];
+    const pairKey = `${keyOf(expression)}=${state}`;
+    if (seen.has(pairKey)) continue;
+    seen.add(pairKey);
+    const studentAccepts = nullable(expression);
+    if (studentAccepts !== exercise.isFinal(state)) return { equivalent: false as const, word, studentAccepts };
+    if (seen.size > 2000) throw new Error('Expression trop complexe pour une correction instantanée.');
+    exercise.alphabet.forEach((symbol) => queue.push([derivative(expression, symbol), exercise.transition(state, symbol), word + symbol]));
+  }
+  return { equivalent: true as const };
+}
+
 function useRoutedEdges(edges: Edge[], selectedEdgeId: string | null = null) {
   return useMemo(() => edges.map((edge) => {
     const siblings = edges.filter((item) => item.source === edge.source && item.target === edge.target);
@@ -457,17 +536,24 @@ function ExerciseData({ exercise }: { exercise: ExerciseDefinition }) {
   return <div className="language-data"><section><strong>Alphabet</strong><div className="math-chips">{exercise.alphabet.map((symbol) => <span className="math-chip" key={symbol}>{showWord(symbol)}</span>)}</div></section><section><strong>Exemples de mots</strong><div className="example-row"><span>Acceptés</span><div className="math-chips">{exercise.accepted.map((word, index) => <span className="math-chip accepted" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div><div className="example-row"><span>Refusés</span><div className="math-chips">{exercise.rejected.map((word, index) => <span className="math-chip rejected" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div></section></div>;
 }
 
-function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRestart, onCheck, children, pickerId, checkLabel = 'Vérifier' }: { exercise: ExerciseDefinition; exercises: ExerciseDefinition[]; solved: number[]; feedback: { ok: boolean; text: string } | null; onSelect: (id: number) => void; onRestart: () => void; onCheck: () => void; children?: React.ReactNode; pickerId: string; checkLabel?: string }) {
+function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRestart, onCheck, children, pickerId, showLanguageDetails = true }: { exercise: ExerciseDefinition; exercises: ExerciseDefinition[]; solved: number[]; feedback: { ok: boolean; text: string } | null; onSelect: (id: number) => void; onRestart: () => void; onCheck: () => void; children?: React.ReactNode; pickerId: string; showLanguageDetails?: boolean }) {
   return <section className="exercise-task">
     <label htmlFor={pickerId}>Exercice</label>
     <ExercisePicker id={pickerId} current={exercise} exercises={exercises} solved={solved} onSelect={onSelect} />
     <h2>{exercise.title}</h2>
-    <p>{exercise.prompt}</p>
-    <ExerciseData exercise={exercise} />
+    {showLanguageDetails && <><p>{exercise.prompt}</p><ExerciseData exercise={exercise} /></>}
     {children}
     {feedback && <Feedback {...feedback} />}
-    <div className="exercise-buttons"><button className="ghost-button" onClick={onRestart}><RotateCcw /> Recommencer</button><button className="primary" onClick={onCheck}><Check /> {checkLabel}</button><button className="ghost-button next-exercise" disabled={exercise.id === exercises.length} onClick={() => onSelect(exercise.id + 1)}>Exercice suivant <ArrowRight /></button></div>
+    <div className="exercise-buttons"><button className="ghost-button" onClick={onRestart}><RotateCcw /> Recommencer</button><button className="primary" onClick={onCheck}><Check /> Vérifier</button><button className="ghost-button next-exercise" disabled={exercise.id === exercises.length} onClick={() => onSelect(exercise.id + 1)}>Exercice suivant <ArrowRight /></button></div>
   </section>;
+}
+
+function RegexAnswer({ id, value, onChange, onCheck }: { id: string; value: string; onChange: (value: string) => void; onCheck: () => void }) {
+  return <div className="regex-answer">
+    <label htmlFor={id}>Votre expression</label>
+    <input id={id} className="regex-input" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Exemple : (a|b)*ab" />
+    <p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>{'\\varepsilon'}</MathText> et parenthèses.</p>
+  </div>;
 }
 
 function Workspace({ sidebar, footer, canvasClassName = '', children }: { sidebar: React.ReactNode; footer?: React.ReactNode; canvasClassName?: string; children: React.ReactNode }) {
@@ -642,12 +728,8 @@ function RegexExercise() {
       setFeedback({ ok: false, text: error instanceof Error ? error.message : 'Expression non reconnue.' });
     }
   };
-  const sidebar = <ExercisePanel exercise={exercise} exercises={regexExercises} solved={solved} feedback={feedback} onSelect={selectExercise} onRestart={restart} onCheck={check} pickerId="regex-exercise" checkLabel="Vérifier">
-    <div className="regex-answer">
-      <label htmlFor="regex">Votre expression</label>
-      <input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} onKeyDown={(event) => { if (event.key === 'Enter') check(); }} placeholder="Exemple : (a|b)*ab" />
-      <p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>{'\\varepsilon'}</MathText> et parenthèses.</p>
-    </div>
+  const sidebar = <ExercisePanel exercise={exercise} exercises={regexExercises} solved={solved} feedback={feedback} onSelect={selectExercise} onRestart={restart} onCheck={check} pickerId="regex-exercise" showLanguageDetails={false}>
+    <RegexAnswer id="automaton-regex" value={regex} onChange={(value) => { setRegex(value); setFeedback(null); }} onCheck={check} />
   </ExercisePanel>;
   return <Workspace sidebar={sidebar} canvasClassName="readonly-canvas">
     <div className="canvas-status"><span>Automate en lecture seule</span></div>
@@ -674,6 +756,37 @@ function RegexExercise() {
   </Workspace>;
 }
 
+function LanguageRegexExercise() {
+  const [exerciseId, setExerciseId] = useState(1);
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [regex, setRegex] = useState('');
+  const { solved, markSolved } = useSolvedExercises('automates-mpi-language-regex-solved-v1', languageRegexExercises.length);
+  const exercise = languageRegexExercises[exerciseId - 1];
+  const restart = () => { setRegex(''); setFeedback(null); };
+  const selectExercise = (id: number) => { setExerciseId(id); setRegex(''); setFeedback(null); };
+  const check = () => {
+    try {
+      const result = compareRegexToLanguage(parseRegex(regex, exercise.alphabet), exercise);
+      const word = result.equivalent ? '' : result.word || 'ε';
+      if (result.equivalent) {
+        setFeedback({ ok: true, text: 'Correct : votre expression reconnaît exactement le langage décrit.' });
+        markSolved(exercise.id);
+      } else {
+        setFeedback({ ok: false, text: `Contre-exemple : « ${word} » est ${result.studentAccepts ? 'accepté par votre expression, mais n’appartient pas au langage décrit' : 'refusé par votre expression, mais appartient au langage décrit'}.` });
+      }
+    } catch (error) {
+      setFeedback({ ok: false, text: error instanceof Error ? error.message : 'Expression non reconnue.' });
+    }
+  };
+  return <section className="standalone-workspace">
+    <div className="standalone-exercise-card">
+      <ExercisePanel exercise={exercise} exercises={languageRegexExercises} solved={solved} feedback={feedback} onSelect={selectExercise} onRestart={restart} onCheck={check} pickerId="language-regex-exercise">
+        <RegexAnswer id="language-regex" value={regex} onChange={(value) => { setRegex(value); setFeedback(null); }} onCheck={check} />
+      </ExercisePanel>
+    </div>
+  </section>;
+}
+
 function Feedback({ ok, text }: { ok: boolean; text: string }) {
   return <div className={`feedback ${ok ? 'success' : 'failure'}`}>{ok ? <Check /> : <X />}<span>{text}</span></div>;
 }
@@ -682,6 +795,7 @@ export default function AutomataApp() {
   const [section, setSection] = useState<Section>('language');
   const nav = [
     ['language', 'Langage → automate'],
+    ['language-regex', 'Langage → expression'],
     ['regex', 'Automate → expression'],
   ] as const;
   return (
@@ -692,6 +806,7 @@ export default function AutomataApp() {
           <nav aria-label="Sections principales">{nav.map(([id, label]) => <button key={id} className={`nav-item ${section === id ? 'active' : ''}`} onClick={() => setSection(id)}>{label}</button>)}</nav>
         </header>
         {section === 'language' && <LanguageExercise />}
+        {section === 'language-regex' && <LanguageRegexExercise />}
         {section === 'regex' && <RegexExercise />}
       </main>
     </ReactFlowProvider>
