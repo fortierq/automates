@@ -156,21 +156,66 @@ const edgeTypes = { automaton: AutomatonEdge };
 const alphabetAB = ['a', 'b'];
 
 const languageExercises: LanguageExerciseDefinition[] = [
-  { id: 1, title: 'Mot vide', prompt: 'Reconnaître le mot vide.', alphabet: alphabetAB, accepted: [''], rejected: ['a', 'b', 'ab'], initial: 'start', isFinal: (state) => state === 'start', transition: () => 'dead' },
-  { id: 2, title: 'Le mot a uniquement', prompt: 'Reconnaître uniquement le mot a.', alphabet: alphabetAB, accepted: ['a'], rejected: ['', 'b', 'aa'], initial: 'start', isFinal: (state) => state === 'a', transition: (state, symbol) => state === 'start' && symbol === 'a' ? 'a' : 'dead' },
-  { id: 3, title: 'Se terminer par a', prompt: 'Reconnaître les mots qui se terminent par a.', alphabet: alphabetAB, accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no', isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no' },
-  { id: 4, title: 'Commencer par b', prompt: 'Reconnaître les mots qui commencent par b.', alphabet: alphabetAB, accepted: ['b', 'ba', 'bbaa'], rejected: ['', 'a', 'ab'], initial: 'start', isFinal: (state) => state === 'yes', transition: (state, symbol) => state === 'start' ? (symbol === 'b' ? 'yes' : 'no') : state },
-  { id: 5, title: 'Contenir ab', prompt: 'Reconnaître les mots qui contiennent le facteur ab.', alphabet: alphabetAB, accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], initial: '0', isFinal: (state) => state === '2', transition: (state, symbol) => state === '2' ? '2' : state === '1' && symbol === 'b' ? '2' : symbol === 'a' ? '1' : '0' },
-  { id: 6, title: 'Un nombre pair de a', prompt: 'Reconnaître les mots contenant un nombre pair de lettres a.', alphabet: alphabetAB, accepted: ['', 'bb', 'aa', 'abba'], rejected: ['a', 'ba', 'aaa'], initial: 'even', isFinal: (state) => state === 'even', transition: (state, symbol) => symbol === 'a' ? (state === 'even' ? 'odd' : 'even') : state },
-  { id: 7, title: 'Aucun facteur bb', prompt: 'Reconnaître les mots qui ne contiennent jamais deux b consécutifs.', alphabet: alphabetAB, accepted: ['', 'a', 'bab', 'ababa'], rejected: ['bb', 'abb', 'bba'], initial: 'ok', isFinal: (state) => state !== 'dead', transition: (state, symbol) => state === 'dead' ? 'dead' : symbol === 'a' ? 'ok' : state === 'b' ? 'dead' : 'b' },
-  { id: 8, title: 'Exactement deux a', prompt: 'Reconnaître les mots contenant exactement deux lettres a.', alphabet: alphabetAB, accepted: ['aa', 'aba', 'bbaab'], rejected: ['', 'a', 'aaa'], initial: '0', isFinal: (state) => state === '2', transition: (state, symbol) => symbol === 'b' ? state : String(Math.min(3, Number(state) + 1)) },
-  { id: 9, title: 'Parités combinées', prompt: 'Reconnaître les mots ayant un nombre pair de a et un nombre impair de b.', alphabet: alphabetAB, accepted: ['b', 'aab', 'baabb'], rejected: ['', 'a', 'bb', 'ab'], initial: '00', isFinal: (state) => state === '01', transition: (state, symbol) => symbol === 'a' ? `${1 - Number(state[0])}${state[1]}` : `${state[0]}${1 - Number(state[1])}` },
-  { id: 10, title: 'Contenir aba et bab', prompt: 'Reconnaître les mots qui contiennent à la fois les facteurs aba et bab.', alphabet: alphabetAB, accepted: ['abab', 'baba', 'aababb'], rejected: ['', 'aba', 'bab', 'abba'], initial: '0|', isFinal: (state) => state.startsWith('3|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; } },
-  { id: 11, title: 'Multiples de trois en binaire', prompt: 'Reconnaître les écritures binaires non vides des entiers divisibles par trois. Les zéros initiaux sont autorisés.', alphabet: ['0', '1'], accepted: ['0', '11', '110', '1001'], rejected: ['', '1', '10', '101'], initial: 'start', isFinal: (state) => state === 'r0', transition: (state, symbol) => { const remainder = state === 'start' ? 0 : Number(state[1]); return `r${(remainder * 2 + Number(symbol)) % 3}`; } },
-  { id: 12, title: 'Jamais trois bits identiques', prompt: 'Reconnaître les mots binaires ne contenant ni 000 ni 111 comme facteur.', alphabet: ['0', '1'], accepted: ['', '0011', '01010', '1100'], rejected: ['000', '111', '10001'], initial: 'start', isFinal: (state) => state !== 'dead', transition: (state, symbol) => { if (state === 'dead' || state === symbol.repeat(2)) return 'dead'; return state.endsWith(symbol) ? symbol.repeat(2) : symbol; } },
-  { id: 13, title: 'Séparateur assorti', prompt: 'Reconnaître les mots contenant exactement un #, avec le même symbole juste avant et juste après #.', alphabet: ['0', '1', '#'], accepted: ['0#0', '101#1', '10#01'], rejected: ['#0', '0#', '0#1', '0#0#0'], initial: 'left-none', isFinal: (state) => state === 'ok', transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'ok') return symbol === '#' ? 'dead' : 'ok'; if (state === 'need-0' || state === 'need-1') return symbol === state.at(-1) ? 'ok' : 'dead'; if (symbol === '#') return state === 'left-none' ? 'dead' : `need-${state.at(-1)}`; return `left-${symbol}`; } },
-  { id: 14, title: 'Trois parités synchronisées', prompt: 'Reconnaître les mots où les nombres de a, de b et de c ont tous la même parité.', alphabet: ['a', 'b', 'c'], accepted: ['', 'abc', 'aabbcc', 'abccba'], rejected: ['a', 'ab', 'abbc'], initial: '000', isFinal: (state) => state === '000' || state === '111', transition: (state, symbol) => { const index = ['a', 'b', 'c'].indexOf(symbol); return state.split('').map((bit, position) => position === index ? String(1 - Number(bit)) : bit).join(''); } },
-  { id: 15, title: 'Congruence croisée modulo cinq', prompt: 'Reconnaître les mots tels que le nombre de a soit congru au double du nombre de b modulo cinq.', alphabet: alphabetAB, accepted: ['', 'aab', 'bbbbb', 'aaaaa'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0', isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : 3)) % 5) },
+  {
+    id: 1, title: 'Positions paires imposées', prompt: 'À toute position paire se trouve la lettre a. Les positions impaires sont libres et la numérotation commence à 1.', alphabet: alphabetAB,
+    accepted: ['', 'a', 'b', 'aa', 'ba', 'aaba'], rejected: ['ab', 'bb', 'babb'], initial: 'even',
+    isFinal: (state) => state !== 'dead', transition: (state, symbol) => state === 'even' ? 'odd' : state === 'odd' && symbol === 'a' ? 'even' : 'dead',
+  },
+  {
+    id: 2, title: 'Deux changements de lettre', prompt: 'Le mot effectue exactement deux changements entre a et b : il est formé de trois blocs non vides alternés.', alphabet: alphabetAB,
+    accepted: ['aba', 'bab', 'aabba', 'aaabbbaa'], rejected: ['', 'a', 'ab', 'abab'], initial: 'start',
+    isFinal: (state) => state.endsWith(':2'), transition: (state, symbol) => { if (state === 'start') return `${symbol}:0`; if (state === 'dead') return 'dead'; const [last, rawChanges] = state.split(':'); const changes = Number(rawChanges) + (last === symbol ? 0 : 1); return changes > 2 ? 'dead' : `${symbol}:${changes}`; },
+  },
+  {
+    id: 3, title: 'Même première et dernière lettre', prompt: 'Le mot est non vide et sa dernière lettre est égale à sa première lettre.', alphabet: alphabetAB,
+    accepted: ['a', 'b', 'aa', 'aba', 'baab'], rejected: ['', 'ab', 'ba', 'abb'], initial: 'start',
+    isFinal: (state) => state !== 'start' && state[0] === state[2], transition: (state, symbol) => state === 'start' ? `${symbol}:${symbol}` : `${state[0]}:${symbol}`,
+  },
+  {
+    id: 4, title: 'Jamais trois bits identiques', prompt: 'Le mot ne contient ni 000 ni 111 comme facteur.', alphabet: ['0', '1'],
+    accepted: ['', '0011', '01010', '1100'], rejected: ['000', '111', '10001'], initial: 'start',
+    isFinal: (state) => state !== 'dead', transition: (state, symbol) => { if (state === 'dead' || state === symbol.repeat(2)) return 'dead'; return state.endsWith(symbol) ? symbol.repeat(2) : symbol; },
+  },
+  {
+    id: 5, title: 'Troisième bit depuis la fin', prompt: 'Le troisième bit en partant de la fin est un 1.', alphabet: ['0', '1'],
+    accepted: ['100', '101', '1110', '01101'], rejected: ['', '10', '010', '1000'], initial: '',
+    isFinal: (state) => state.length >= 3 && state.at(-3) === '1', transition: (state, symbol) => (state + symbol).slice(-3),
+  },
+  {
+    id: 6, title: 'Un seul des deux facteurs', prompt: 'Le mot contient exactement l’un des deux facteurs aba et bab.', alphabet: alphabetAB,
+    accepted: ['aba', 'bab', 'aabaa', 'bbabb'], rejected: ['', 'abba', 'abab', 'baba'], initial: '0|',
+    isFinal: (state) => state.startsWith('1|') || state.startsWith('2|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; },
+  },
+  {
+    id: 7, title: 'Lettres c assorties', prompt: 'Chaque c est immédiatement précédé et suivi de la même lettre : aca ou bcb.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'ab', 'aca', 'bcb', 'abcbaca'], rejected: ['c', 'ac', 'acb', 'cca'], initial: 'none',
+    isFinal: (state) => state === 'none' || state.startsWith('last-'), transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'need-a' || state === 'need-b') return symbol === state.at(-1) ? `last-${symbol}` : 'dead'; if (symbol === 'c') return state === 'last-a' ? 'need-a' : state === 'last-b' ? 'need-b' : 'dead'; return `last-${symbol}`; },
+  },
+  {
+    id: 8, title: 'Parités opposées autour de #', prompt: 'Le mot contient exactement un #. Les nombres de 1 placés avant et après # ont des parités différentes.', alphabet: ['0', '1', '#'],
+    accepted: ['#1', '1#', '10#11', '11#1'], rejected: ['', '#', '1#1', '#11', '1#0#'], initial: 'pre:0',
+    isFinal: (state) => { const parts = state.split(':'); return parts[0] === 'post' && parts[1] !== parts[2]; }, transition: (state, symbol) => { if (state === 'dead') return 'dead'; const parts = state.split(':'); if (parts[0] === 'pre') { if (symbol === '#') return `post:${parts[1]}:0`; return `pre:${symbol === '1' ? 1 - Number(parts[1]) : parts[1]}`; } if (symbol === '#') return 'dead'; return `post:${parts[1]}:${symbol === '1' ? 1 - Number(parts[2]) : parts[2]}`; },
+  },
+  {
+    id: 9, title: 'Première lettre inédite après #', prompt: 'Le mot contient exactement un # et au moins un bit après lui. Le premier bit après # n’est jamais apparu avant #.', alphabet: ['0', '1', '#'],
+    accepted: ['#0', '#101', '0#1', '000#1'], rejected: ['#', '0#0', '01#0', '0#1#'], initial: 'pre:0',
+    isFinal: (state) => state === 'ok', transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'ok') return symbol === '#' ? 'dead' : 'ok'; const [side, rawMask] = state.split(':'); const mask = Number(rawMask); if (side === 'pre') { if (symbol === '#') return `need:${mask}`; return `pre:${mask | (symbol === '0' ? 1 : 2)}`; } if (symbol === '#') return 'dead'; const bit = symbol === '0' ? 1 : 2; return mask & bit ? 'dead' : 'ok'; },
+  },
+  {
+    id: 10, title: 'Multiples de trois en binaire', prompt: 'Reconnaître les écritures binaires non vides des entiers divisibles par trois. Les zéros initiaux sont autorisés.', alphabet: ['0', '1'],
+    accepted: ['0', '11', '110', '1001'], rejected: ['', '1', '10', '101'], initial: 'start',
+    isFinal: (state) => state === 'r0', transition: (state, symbol) => { const remainder = state === 'start' ? 0 : Number(state[1]); return `r${(remainder * 2 + Number(symbol)) % 3}`; },
+  },
+  {
+    id: 11, title: 'Trois parités synchronisées', prompt: 'Les nombres de a, de b et de c ont tous la même parité.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'abc', 'aabbcc', 'abccba'], rejected: ['a', 'ab', 'abbc'], initial: '000',
+    isFinal: (state) => state === '000' || state === '111', transition: (state, symbol) => { const index = ['a', 'b', 'c'].indexOf(symbol); return state.split('').map((bit, position) => position === index ? String(1 - Number(bit)) : bit).join(''); },
+  },
+  {
+    id: 12, title: 'Congruence croisée modulo cinq', prompt: 'Le nombre de a est congru au double du nombre de b modulo cinq. La lettre c est neutre.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'c', 'aab', 'bbbbb', 'aaaaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
+    isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : symbol === 'b' ? 3 : 0)) % 5),
+  },
 ];
 
 const languageRegexExercises: LanguageExerciseDefinition[] = [
@@ -444,7 +489,7 @@ const derivative = (ast: RegexAst, symbol: string): RegexAst => {
 };
 
 function parseRegex(source: string, alphabet: string[]) {
-  const normalized = source.replaceAll('\\varepsilon', 'ε').replaceAll(/\s|·/g, '').replaceAll('+', '|');
+  const normalized = source.replaceAll('\\varepsilon', 'ε').replaceAll('e', 'ε').replaceAll(/\s|·/g, '').replaceAll('+', '|');
   if (!normalized) throw new Error('Saisissez une expression.');
   return new RegexParser(normalized, new Set(alphabet)).parse();
 }
@@ -551,8 +596,7 @@ function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRest
 function RegexAnswer({ id, value, onChange, onCheck }: { id: string; value: string; onChange: (value: string) => void; onCheck: () => void }) {
   return <div className="regex-answer">
     <label htmlFor={id}>Votre expression</label>
-    <input id={id} className="regex-input" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Exemple : (a|b)*ab" />
-    <p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>{'\\varepsilon'}</MathText> et parenthèses.</p>
+    <input id={id} className="regex-input" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Exemple : (a|b)*(ab|e)" />
   </div>;
 }
 
@@ -667,7 +711,7 @@ function LanguageExercise() {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [exerciseId, setExerciseId] = useState(1);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
-  const { solved, markSolved } = useSolvedExercises('automates-mpi-language-solved', languageExercises.length);
+  const { solved, markSolved } = useSolvedExercises('automates-mpi-language-solved-v2', languageExercises.length);
   const exercise = languageExercises[exerciseId - 1];
 
   const restart = () => {
