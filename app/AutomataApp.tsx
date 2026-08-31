@@ -26,7 +26,6 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import {
   ArrowRight,
-  BookOpen,
   Check,
   ChevronDown,
   Clipboard,
@@ -40,7 +39,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type StateNode, useGraphStore } from './automataStore';
 
-type Section = 'language' | 'regex' | 'methods';
+type Section = 'language' | 'regex';
 type EdgeRouteData = {
   routeOffset?: number;
 };
@@ -184,64 +183,64 @@ const exerciseEdge = (id: string, source: string, target: string, label: string)
 
 const regexExercises: RegexExerciseDefinition[] = [
   {
-    id: 1, title: 'Une seule lettre', prompt: 'Donner une expression régulière équivalente à cet automate.', alphabet: alphabetAB,
-    accepted: ['a'], rejected: ['', 'b', 'aa'], answer: 'a',
-    nodes: [exerciseNode('q0', 180, 210, true), exerciseNode('q1', 450, 210, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q1', 'a')],
-  },
-  {
-    id: 2, title: 'Choisir une lettre', prompt: 'L’automate accepte exactement les mots d’une lettre.', alphabet: alphabetAB,
-    accepted: ['a', 'b'], rejected: ['', 'ab', 'aa'], answer: 'a|b',
-    nodes: [exerciseNode('q0', 180, 210, true), exerciseNode('q1', 450, 210, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q1', 'a, b')],
-  },
-  {
-    id: 3, title: 'Deux lettres successives', prompt: 'Lire la concaténation imposée par cette chaîne d’états.', alphabet: alphabetAB,
-    accepted: ['ab'], rejected: ['', 'a', 'ba', 'abb'], answer: 'ab',
-    nodes: [exerciseNode('q0', 100, 210, true), exerciseNode('q1', 360, 210), exerciseNode('q2', 620, 210, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q1', 'q2', 'b')],
-  },
-  {
-    id: 4, title: 'Répéter librement', prompt: 'Traduire une boucle sur un état à la fois initial et final.', alphabet: alphabetAB,
-    accepted: ['', 'a', 'aa', 'aaaa'], rejected: ['b', 'ab'], answer: 'a*',
-    nodes: [exerciseNode('q0', 360, 230, true, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', 'a')],
-  },
-  {
-    id: 5, title: 'Blocs alternatifs', prompt: 'Chaque retour à l’état initial termine un bloc autorisé.', alphabet: alphabetAB,
-    accepted: ['', 'ab', 'ba', 'abba', 'baab'], rejected: ['a', 'b', 'aa', 'abb'], answer: '(ab|ba)*',
-    nodes: [exerciseNode('q0', 150, 230, true, true), exerciseNode('q1', 470, 120), exerciseNode('q2', 470, 340)],
-    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q1', 'q0', 'b'), exerciseEdge('e2', 'q0', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q0', 'a')],
-  },
-  {
-    id: 6, title: 'Se terminer par b', prompt: 'Les préfixes sont libres, mais la dernière lettre décide de l’acceptation.', alphabet: alphabetAB,
-    accepted: ['b', 'ab', 'aabb'], rejected: ['', 'a', 'bba'], answer: '(a|b)*b',
+    id: 1, title: 'Exactement un b', prompt: 'Les deux boucles autorisent des a avant et après l’unique b.', alphabet: alphabetAB,
+    accepted: ['b', 'ab', 'baa'], rejected: ['', 'a', 'bb', 'bab'], answer: 'a*ba*',
     nodes: [exerciseNode('q0', 190, 220, true), exerciseNode('q1', 500, 220, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', 'a'), exerciseEdge('e1', 'q0', 'q1', 'b'), exerciseEdge('e2', 'q1', 'q0', 'a'), exerciseEdge('e3', 'q1', 'q1', 'b')],
+    edges: [exerciseEdge('e0', 'q0', 'q0', 'a'), exerciseEdge('e1', 'q0', 'q1', 'b'), exerciseEdge('e2', 'q1', 'q1', 'a')],
   },
   {
-    id: 7, title: 'Contenir le facteur ab', prompt: 'Repérer la branche qui devine le début du facteur recherché.', alphabet: alphabetAB,
-    accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], answer: '(a|b)*ab(a|b)*',
-    nodes: [exerciseNode('q0', 100, 220, true), exerciseNode('q1', 360, 220), exerciseNode('q2', 620, 220, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', 'a, b'), exerciseEdge('e1', 'q0', 'q1', 'a'), exerciseEdge('e2', 'q1', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q2', 'a, b')],
-  },
-  {
-    id: 8, title: 'Jamais deux 1 consécutifs', prompt: 'L’absence d’une transition interdit le facteur 11.', alphabet: ['0', '1'],
-    accepted: ['', '0', '1', '10101'], rejected: ['11', '011', '110'], answer: '(0|10)*(ε|1)',
-    nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', '0'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q0', '0')],
-  },
-  {
-    id: 9, title: 'Un nombre pair de 0', prompt: 'Chaque lecture de 0 change la parité mémorisée par l’automate.', alphabet: ['0', '1'],
-    accepted: ['', '1', '00', '10101'], rejected: ['0', '10', '000'], answer: '1*(01*01*)*',
+    id: 2, title: 'Chaque a appelle un b', prompt: 'Toute lettre a doit être immédiatement suivie d’un b.', alphabet: alphabetAB,
+    accepted: ['', 'b', 'ab', 'babb'], rejected: ['a', 'aa', 'ba'], answer: '(b|ab)*',
     nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', '1'), exerciseEdge('e1', 'q0', 'q1', '0'), exerciseEdge('e2', 'q1', 'q0', '0'), exerciseEdge('e3', 'q1', 'q1', '1')],
+    edges: [exerciseEdge('e0', 'q0', 'q0', 'b'), exerciseEdge('e1', 'q0', 'q1', 'a'), exerciseEdge('e2', 'q1', 'q0', 'b')],
   },
   {
-    id: 10, title: 'Compter les a modulo trois', prompt: 'Les lettres b et c sont neutres ; trois lectures de a ramènent à l’état final.', alphabet: ['a', 'b', 'c'],
+    id: 3, title: 'Un a à chaque position paire', prompt: 'Les positions sont comptées à partir de 1 ; les positions impaires restent libres.', alphabet: alphabetAB,
+    accepted: ['', 'a', 'b', 'aa', 'ba', 'aaba'], rejected: ['ab', 'bb', 'babb'], answer: '((a|b)a)*(ε|a|b)',
+    nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q1', 'a, b'), exerciseEdge('e1', 'q1', 'q0', 'a')],
+  },
+  {
+    id: 4, title: 'Même première et dernière lettre', prompt: 'L’automate mémorise la première lettre puis actualise seulement la dernière.', alphabet: alphabetAB,
+    accepted: ['a', 'b', 'aa', 'aba', 'baab'], rejected: ['', 'ab', 'ba', 'abb'], answer: 'a((a|b)*a|ε)|b((a|b)*b|ε)',
+    nodes: [exerciseNode('q0', 60, 230, true), exerciseNode('q1', 300, 90, false, true), exerciseNode('q2', 570, 90), exerciseNode('q3', 300, 350, false, true), exerciseNode('q4', 570, 350)],
+    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q0', 'q3', 'b'), exerciseEdge('e2', 'q1', 'q1', 'a'), exerciseEdge('e3', 'q1', 'q2', 'b'), exerciseEdge('e4', 'q2', 'q1', 'a'), exerciseEdge('e5', 'q2', 'q2', 'b'), exerciseEdge('e6', 'q3', 'q3', 'b'), exerciseEdge('e7', 'q3', 'q4', 'a'), exerciseEdge('e8', 'q4', 'q3', 'b'), exerciseEdge('e9', 'q4', 'q4', 'a')],
+  },
+  {
+    id: 5, title: 'Blocs de 1 de longueur paire', prompt: 'Un bloc de 1 ne peut être quitté ni terminer tant que sa longueur est impaire.', alphabet: ['0', '1'],
+    accepted: ['', '0', '11', '01100', '11011'], rejected: ['1', '10', '111', '101'], answer: '(0|11)*',
+    nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', '0'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q0', '1')],
+  },
+  {
+    id: 6, title: 'Lettres strictement alternées', prompt: 'Après la première lettre, une seule transition reste possible à chaque étape.', alphabet: alphabetAB,
+    accepted: ['', 'a', 'b', 'ab', 'baba'], rejected: ['aa', 'bb', 'abb'], answer: '(ab)*(ε|a)|(ba)*(ε|b)',
+    nodes: [exerciseNode('q0', 120, 220, true, true), exerciseNode('q1', 470, 100, false, true), exerciseNode('q2', 470, 340, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q0', 'q2', 'b'), exerciseEdge('e2', 'q1', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q1', 'a')],
+  },
+  {
+    id: 7, title: 'Le troisième bit en partant de la fin', prompt: 'La branche non déterministe choisit le 1 qui devra se retrouver en troisième position depuis la fin.', alphabet: ['0', '1'],
+    accepted: ['100', '101', '1110'], rejected: ['', '10', '010', '1000'], answer: '(0|1)*1(0|1)(0|1)',
+    nodes: [exerciseNode('q0', 60, 220, true), exerciseNode('q1', 280, 220), exerciseNode('q2', 500, 220), exerciseNode('q3', 720, 220, false, true)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', '0, 1'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q2', '0, 1'), exerciseEdge('e3', 'q2', 'q3', '0, 1')],
+  },
+  {
+    id: 8, title: 'Deux parités simultanées', prompt: 'Reconnaître les mots ayant à la fois un nombre pair de a et un nombre pair de b.', alphabet: alphabetAB,
+    accepted: ['', 'aa', 'bb', 'abba', 'abab'], rejected: ['a', 'b', 'ab', 'aab'], answer: '(aa|bb|(ab|ba)(aa|bb)*(ab|ba))*',
+    nodes: [exerciseNode('q0', 180, 100, true, true), exerciseNode('q1', 500, 100), exerciseNode('q2', 180, 350), exerciseNode('q3', 500, 350)],
+    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q1', 'q0', 'a'), exerciseEdge('e2', 'q0', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q0', 'b'), exerciseEdge('e4', 'q1', 'q3', 'b'), exerciseEdge('e5', 'q3', 'q1', 'b'), exerciseEdge('e6', 'q2', 'q3', 'a'), exerciseEdge('e7', 'q3', 'q2', 'a')],
+  },
+  {
+    id: 9, title: 'Compter les a modulo trois', prompt: 'Les lettres b et c sont neutres ; trois lectures de a ramènent à l’état final.', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'bbb', 'aaa', 'abacac'], rejected: ['a', 'aa', 'abca'], answer: '(b|c)*(a(b|c)*a(b|c)*a(b|c)*)*',
     nodes: [exerciseNode('q0', 110, 220, true, true), exerciseNode('q1', 360, 100), exerciseNode('q2', 610, 220)],
     edges: [exerciseEdge('e0', 'q0', 'q0', 'b, c'), exerciseEdge('e1', 'q1', 'q1', 'b, c'), exerciseEdge('e2', 'q2', 'q2', 'b, c'), exerciseEdge('e3', 'q0', 'q1', 'a'), exerciseEdge('e4', 'q1', 'q2', 'a'), exerciseEdge('e5', 'q2', 'q0', 'a')],
+  },
+  {
+    id: 10, title: 'Multiples de trois en binaire', prompt: 'Les états mémorisent le reste modulo trois de la valeur binaire déjà lue.', alphabet: ['0', '1'],
+    accepted: ['', '0', '11', '110', '1001'], rejected: ['1', '10', '101', '111'], answer: '(0|1(01*0)*1)*',
+    nodes: [exerciseNode('q0', 120, 220, true, true), exerciseNode('q1', 440, 90), exerciseNode('q2', 440, 350)],
+    edges: [exerciseEdge('e0', 'q0', 'q0', '0'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q2', '0'), exerciseEdge('e3', 'q1', 'q0', '1'), exerciseEdge('e4', 'q2', 'q1', '0'), exerciseEdge('e5', 'q2', 'q2', '1')],
   },
 ];
 
@@ -616,7 +615,7 @@ function RegexExercise() {
   const [exerciseId, setExerciseId] = useState(1);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
   const [regex, setRegex] = useState('');
-  const { solved, markSolved } = useSolvedExercises('automates-mpi-regex-solved', regexExercises.length);
+  const { solved, markSolved } = useSolvedExercises('automates-mpi-regex-solved-v2', regexExercises.length);
   const exercise = regexExercises[exerciseId - 1];
   const routedEdges = useRoutedEdges(exercise.edges);
 
@@ -679,20 +678,11 @@ function Feedback({ ok, text }: { ok: boolean; text: string }) {
   return <div className={`feedback ${ok ? 'success' : 'failure'}`}>{ok ? <Check /> : <X />}<span>{text}</span></div>;
 }
 
-function Methods() {
-  return <section className="methods-page"><div className="methods-intro"><span className="eyebrow">Bientôt</span><h1>Les algorithmes du cours, étape par étape.</h1><p>Chaque méthode sera manipulable visuellement, avec contrôle de chaque étape.</p></div><div className="method-grid">{[
-    ['01', 'Déterminisation', 'Construire les états comme ensembles d’états.'],
-    ['02', 'Automate de Glushkov', 'Passer d’une expression régulière à un automate.'],
-    ['03', 'Élimination des états', 'Retrouver une expression régulière depuis un automate.'],
-  ].map(([number, title, text]) => <article key={number}><span>{number}</span><BookOpen /><h2>{title}</h2><p>{text}</p><small>En préparation</small></article>)}</div></section>;
-}
-
 export default function AutomataApp() {
   const [section, setSection] = useState<Section>('language');
   const nav = [
     ['language', 'Langage → automate'],
     ['regex', 'Automate → expression'],
-    ['methods', 'Méthodes'],
   ] as const;
   return (
     <ReactFlowProvider>
@@ -703,7 +693,6 @@ export default function AutomataApp() {
         </header>
         {section === 'language' && <LanguageExercise />}
         {section === 'regex' && <RegexExercise />}
-        {section === 'methods' && <Methods />}
       </main>
     </ReactFlowProvider>
   );
