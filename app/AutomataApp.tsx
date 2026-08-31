@@ -646,7 +646,7 @@ function RegexExercise() {
   const sidebar = <ExercisePanel exercise={exercise} exercises={regexExercises} solved={solved} feedback={feedback} onSelect={selectExercise} onRestart={restart} onCheck={check} pickerId="regex-exercise" checkLabel="Vérifier">
     <div className="regex-answer">
       <label htmlFor="regex">Votre expression</label>
-      <input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} onKeyDown={(event) => { if (event.key === 'Enter') check(); }} placeholder="Ex. (a|b)*ab" />
+      <input id="regex" className="regex-input" value={regex} onChange={(event) => { setRegex(event.target.value); setFeedback(null); }} onKeyDown={(event) => { if (event.key === 'Enter') check(); }} placeholder="Exemple : (a|b)*ab" />
       <p>Notation : <MathText>{'\\mid'}</MathText> ou <MathText>+</MathText> pour l’union, <MathText>*</MathText>, <MathText>{'\\varepsilon'}</MathText> et parenthèses.</p>
     </div>
   </ExercisePanel>;
