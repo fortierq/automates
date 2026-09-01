@@ -99,8 +99,9 @@ function State({ data, selected }: NodeProps<StateNode>) {
         if (event.pointerType !== 'touch' || connectionRole) return;
         touchStart.current = { x: event.clientX, y: event.clientY };
         longPressTimer.current = setTimeout(() => {
+          const point = touchStart.current;
           longPressAt.current = Date.now();
-          data.onLongPress?.();
+          if (point) data.onLongPress?.(point);
           navigator.vibrate?.(12);
           longPressTimer.current = null;
         }, 450);
@@ -667,12 +668,62 @@ function Workspace({ sidebar, footer, canvasClassName = '', children }: { sideba
   </section>;
 }
 
+function TransitionPreview({ source, target, pointer, flow, container, label }: {
+  source: StateNode;
+  target?: StateNode;
+  pointer: { x: number; y: number };
+  flow: ReactFlowInstance<StateNode, Edge>;
+  container: HTMLDivElement;
+  label: string;
+}) {
+  const rect = container.getBoundingClientRect();
+  const zoom = flow.getZoom();
+  const center = (node: StateNode) => {
+    const width = node.measured?.width ?? 68;
+    const height = node.measured?.height ?? 68;
+    const screen = flow.flowToScreenPosition({ x: node.position.x + width / 2, y: node.position.y + height / 2 });
+    return { x: screen.x - rect.left, y: screen.y - rect.top, radius: Math.min(width, height) / 2 * zoom };
+  };
+  const sourceCenter = center(source);
+  let path: string;
+  let labelX: number;
+  let labelY: number;
+
+  if (target?.id === source.id) {
+    const lift = 78 * zoom;
+    path = `M ${sourceCenter.x + sourceCenter.radius} ${sourceCenter.y} C ${sourceCenter.x + sourceCenter.radius + 48 * zoom} ${sourceCenter.y - lift}, ${sourceCenter.x - sourceCenter.radius - 48 * zoom} ${sourceCenter.y - lift}, ${sourceCenter.x - sourceCenter.radius - 3 * zoom} ${sourceCenter.y}`;
+    labelX = sourceCenter.x;
+    labelY = sourceCenter.y - lift + 7 * zoom;
+  } else {
+    const destination = target ? center(target) : { x: pointer.x - rect.left, y: pointer.y - rect.top, radius: 0 };
+    const dx = destination.x - sourceCenter.x;
+    const dy = destination.y - sourceCenter.y;
+    const length = Math.hypot(dx, dy) || 1;
+    const start = { x: sourceCenter.x + dx / length * sourceCenter.radius, y: sourceCenter.y + dy / length * sourceCenter.radius };
+    const endGap = target ? destination.radius + 3 * zoom : 0;
+    const end = { x: destination.x - dx / length * endGap, y: destination.y - dy / length * endGap };
+    path = `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+    labelX = (start.x + end.x) / 2;
+    labelY = (start.y + end.y) / 2 - 12;
+  }
+
+  return <svg className="transition-preview" aria-hidden="true">
+    <defs><marker id="preview-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z" /></marker></defs>
+    <path className="transition-preview-path" d={path} markerEnd="url(#preview-arrow)" />
+    <text className="transition-preview-label" x={labelX} y={labelY}>{label}</text>
+  </svg>;
+}
+
 function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: React.ReactNode; defaultSymbol?: string }) {
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [transitionSourceId, setTransitionSourceId] = useState<string | null>(null);
+  const [transitionTargetId, setTransitionTargetId] = useState<string | null>(null);
+  const [transitionPointer, setTransitionPointer] = useState<{ x: number; y: number } | null>(null);
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
+  const [previewFlow, setPreviewFlow] = useState<ReactFlowInstance<StateNode, Edge> | null>(null);
+  const [editorCanvas, setEditorCanvas] = useState<HTMLDivElement | null>(null);
   const paneLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const paneTouchStart = useRef<{ x: number; y: number } | null>(null);
   const previousNodes = useRef(nodes);
@@ -686,7 +737,11 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   useEffect(() => cancelPaneLongPress, [cancelPaneLongPress]);
 
   useEffect(() => {
-    if (previousNodes.current !== nodes) setTransitionSourceId(null);
+    if (previousNodes.current !== nodes) {
+      setTransitionSourceId(null);
+      setTransitionTargetId(null);
+      setTransitionPointer(null);
+    }
     previousNodes.current = nodes;
   }, [nodes]);
 
@@ -702,8 +757,10 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
     setNodes([...nodes, { id: `q${index}`, type: 'state', position, data: { label: String(index) } }]);
   }, [nodes, setNodes]);
 
-  const armTransition = useCallback((nodeId: string) => {
+  const armTransition = useCallback((nodeId: string, point: { x: number; y: number }) => {
     setTransitionSourceId(nodeId);
+    setTransitionTargetId(null);
+    setTransitionPointer(point);
     setSelectedNodeId(nodeId);
     setSelectedEdgeId(null);
   }, []);
@@ -711,6 +768,8 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
     const id = `${source}-${target}-${Date.now()}`;
     setEdges([...edges, { id, source, target, label: defaultSymbol, type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }]);
     setTransitionSourceId(null);
+    setTransitionTargetId(null);
+    setTransitionPointer(null);
     setSelectedNodeId(null);
     setSelectedEdgeId(id);
   }, [defaultSymbol, edges, setEdges]);
@@ -764,7 +823,11 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   </>;
   const footer = <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger LaTeX"><Download /></button></div>;
 
+  const previewSource = nodes.find((node) => node.id === transitionSourceId);
+  const previewTarget = nodes.find((node) => node.id === transitionTargetId);
+
   return <Workspace sidebar={sidebar} footer={footer}>
+      <div ref={setEditorCanvas} className="editor-canvas" onPointerLeave={() => setTransitionPointer(null)}>
         <ReactFlow<StateNode, Edge>
           onPointerDownCapture={(event) => {
             if (event.pointerType !== 'touch' || !(event.target instanceof Element) || !event.target.classList.contains('react-flow__pane')) return;
@@ -778,21 +841,24 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           onPointerMoveCapture={(event) => {
             const start = paneTouchStart.current;
             if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) cancelPaneLongPress();
+            if (transitionSourceId) setTransitionPointer({ x: event.clientX, y: event.clientY });
           }}
           onPointerUpCapture={cancelPaneLongPress}
           onPointerCancelCapture={cancelPaneLongPress}
-          nodes={nodes.map((node) => ({ ...node, selected: node.id === selectedNodeId, data: { ...node.data, connectionRole: transitionSourceId ? (node.id === transitionSourceId ? 'source' : 'target') : undefined, onLongPress: () => armTransition(node.id) } }))}
+          nodes={nodes.map((node) => ({ ...node, selected: node.id === selectedNodeId, data: { ...node.data, connectionRole: transitionSourceId ? (node.id === transitionSourceId ? 'source' : 'target') : undefined, onLongPress: (point) => armTransition(node.id, point) } }))}
           edges={routedEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          onInit={(instance) => { flow.current = instance; }}
+          onInit={(instance) => { flow.current = instance; setPreviewFlow(instance); }}
           onNodesChange={(changes) => setNodes(applyNodeChanges(changes, nodes) as StateNode[])}
           onEdgesChange={(changes) => setEdges(applyEdgeChanges(changes, edges))}
           onNodeClick={onNodeClick}
-          onNodeContextMenu={(event, node) => { event.preventDefault(); event.stopPropagation(); if (transitionSourceId) createTransition(transitionSourceId, node.id); else armTransition(node.id); }}
-          onEdgeClick={(_, edge) => { setTransitionSourceId(null); setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
-          onPaneClick={() => { setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); }}
-          onPaneContextMenu={(event) => { event.preventDefault(); setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); addState(event.clientX, event.clientY); }}
+          onNodeMouseEnter={(_, node) => { if (transitionSourceId) setTransitionTargetId(node.id); }}
+          onNodeMouseLeave={() => setTransitionTargetId(null)}
+          onNodeContextMenu={(event, node) => { event.preventDefault(); event.stopPropagation(); if (transitionSourceId) createTransition(transitionSourceId, node.id); else armTransition(node.id, { x: event.clientX, y: event.clientY }); }}
+          onEdgeClick={(_, edge) => { setTransitionSourceId(null); setTransitionTargetId(null); setTransitionPointer(null); setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
+          onPaneClick={() => { setTransitionSourceId(null); setTransitionTargetId(null); setTransitionPointer(null); setSelectedNodeId(null); setSelectedEdgeId(null); }}
+          onPaneContextMenu={(event) => { event.preventDefault(); setTransitionSourceId(null); setTransitionTargetId(null); setTransitionPointer(null); setSelectedNodeId(null); setSelectedEdgeId(null); addState(event.clientX, event.clientY); }}
           onNodesDelete={(deleted) => { if (deleted.some((node) => node.id === selectedNodeId)) setSelectedNodeId(null); if (deleted.some((node) => node.id === transitionSourceId)) setTransitionSourceId(null); }}
           onEdgesDelete={(deleted) => { if (deleted.some((edge) => edge.id === selectedEdgeId)) setSelectedEdgeId(null); }}
           fitView minZoom={0.3} maxZoom={2} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
@@ -800,6 +866,8 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cdd6ce" />
           <Controls showInteractive={false} position="top-right" />
         </ReactFlow>
+        {previewSource && transitionPointer && previewFlow && editorCanvas && <TransitionPreview source={previewSource} target={previewTarget} pointer={transitionPointer} flow={previewFlow} container={editorCanvas} label={defaultSymbol} />}
+      </div>
   </Workspace>;
 }
 
