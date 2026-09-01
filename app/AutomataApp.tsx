@@ -579,21 +579,19 @@ const showWord = (word: string) => word ? <MathText>{word.replaceAll('#', '\\#')
 function ExercisePicker({ current, exercises, solved, onSelect, id }: { current: ExerciseDefinition; exercises: ExerciseDefinition[]; solved: number[]; onSelect: (id: number) => void; id: string }) {
   const [open, setOpen] = useState(false);
   return <div className="exercise-picker" onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }}>
-    <button id={id} className={`exercise-picker-trigger ${solved.includes(current.id) ? 'is-solved' : ''}`} aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>{String(current.id).padStart(2, '0')} — {current.title}</span><ChevronDown /></button>
+    <button id={id} className={`exercise-picker-trigger ${solved.includes(current.id) ? 'is-solved' : ''}`} aria-label="Choisir un exercice" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>{String(current.id).padStart(2, '0')} — {current.title}</span><ChevronDown /></button>
     {open && <div className="exercise-picker-menu" role="listbox" aria-label="Choisir un exercice">{exercises.map((item) => <button key={item.id} role="option" aria-selected={item.id === current.id} className={`${solved.includes(item.id) ? 'is-solved' : ''} ${item.id === current.id ? 'is-current' : ''}`} onClick={() => { setOpen(false); onSelect(item.id); }}><span>{String(item.id).padStart(2, '0')}</span>{item.title}</button>)}</div>}
   </div>;
 }
 
 function ExerciseData({ exercise }: { exercise: ExerciseDefinition }) {
-  return <div className="language-data"><section><strong>Alphabet</strong><div className="math-chips">{exercise.alphabet.map((symbol) => <span className="math-chip" key={symbol}>{showWord(symbol)}</span>)}</div></section><section><strong>Exemples de mots</strong><div className="example-row"><span>Acceptés</span><div className="math-chips">{exercise.accepted.map((word, index) => <span className="math-chip accepted" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div><div className="example-row"><span>Refusés</span><div className="math-chips">{exercise.rejected.map((word, index) => <span className="math-chip rejected" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div></section></div>;
+  return <div className="language-data"><section><strong>Langage</strong><p className="language-description"><InlineMathText>{exercise.prompt}</InlineMathText></p></section><section><strong>Alphabet</strong><div className="math-chips">{exercise.alphabet.map((symbol) => <span className="math-chip" key={symbol}>{showWord(symbol)}</span>)}</div></section><section><strong>Exemples de mots</strong><div className="example-row"><span>Acceptés</span><div className="math-chips">{exercise.accepted.map((word, index) => <span className="math-chip accepted" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div><div className="example-row"><span>Refusés</span><div className="math-chips">{exercise.rejected.map((word, index) => <span className="math-chip rejected" key={`${word}-${index}`}>{showWord(word)}</span>)}</div></div></section></div>;
 }
 
 function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRestart, onCheck, children, pickerId, showLanguageDetails = true }: { exercise: ExerciseDefinition; exercises: ExerciseDefinition[]; solved: number[]; feedback: { ok: boolean; text: string } | null; onSelect: (id: number) => void; onRestart: () => void; onCheck: () => void; children?: React.ReactNode; pickerId: string; showLanguageDetails?: boolean }) {
   return <section className="exercise-task">
-    <label htmlFor={pickerId}>Exercice</label>
     <ExercisePicker id={pickerId} current={exercise} exercises={exercises} solved={solved} onSelect={onSelect} />
-    <h2>{exercise.title}</h2>
-    {showLanguageDetails && <><p><InlineMathText>{exercise.prompt}</InlineMathText></p><ExerciseData exercise={exercise} /></>}
+    {showLanguageDetails && <ExerciseData exercise={exercise} />}
     {children}
     {feedback && <Feedback {...feedback} />}
     <div className="exercise-buttons"><button className="ghost-button" onClick={onRestart}><RotateCcw /> Recommencer</button><button className="primary" onClick={onCheck}><Check /> Vérifier</button><button className="ghost-button next-exercise" disabled={exercise.id === exercises.length} onClick={() => onSelect(exercise.id + 1)}>Exercice suivant <ArrowRight /></button></div>
@@ -602,8 +600,7 @@ function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRest
 
 function RegexAnswer({ id, value, onChange, onCheck }: { id: string; value: string; onChange: (value: string) => void; onCheck: () => void }) {
   return <div className="regex-answer">
-    <label htmlFor={id}>Votre expression</label>
-    <input id={id} className="regex-input" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Utiliser *, |, e, (...)" />
+    <input id={id} className="regex-input" aria-label="Votre expression" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Utiliser *, |, e, (...)" />
   </div>;
 }
 
