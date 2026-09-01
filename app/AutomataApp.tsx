@@ -627,8 +627,8 @@ const showWord = (word: string) => word ? <MathText>{word.replaceAll('#', '\\#')
 function ExercisePicker({ current, exercises, solved, onSelect, id }: { current: ExerciseDefinition; exercises: ExerciseDefinition[]; solved: number[]; onSelect: (id: number) => void; id: string }) {
   const [open, setOpen] = useState(false);
   return <div className="exercise-picker" onKeyDown={(event) => { if (event.key === 'Escape') setOpen(false); }}>
-    <button id={id} className={`exercise-picker-trigger ${solved.includes(current.id) ? 'is-solved' : ''}`} aria-label="Choisir un exercice" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span>{String(current.id).padStart(2, '0')} — {current.title}</span><ChevronDown /></button>
-    {open && <div className="exercise-picker-menu" role="listbox" aria-label="Choisir un exercice">{exercises.map((item) => <button key={item.id} role="option" aria-selected={item.id === current.id} className={`${solved.includes(item.id) ? 'is-solved' : ''} ${item.id === current.id ? 'is-current' : ''}`} onClick={() => { setOpen(false); onSelect(item.id); }}><span>{String(item.id).padStart(2, '0')}</span>{item.title}</button>)}</div>}
+    <button id={id} className={`exercise-picker-trigger ${solved.includes(current.id) ? 'is-solved' : ''}`} aria-label="Choisir un exercice" aria-haspopup="listbox" aria-expanded={open} onClick={() => setOpen((value) => !value)}><span><span className="exercise-number">{String(current.id).padStart(2, '0')}</span> — {current.title}</span><ChevronDown /></button>
+    {open && <div className="exercise-picker-menu" role="listbox" aria-label="Choisir un exercice">{exercises.map((item) => <button key={item.id} role="option" aria-selected={item.id === current.id} className={`${solved.includes(item.id) ? 'is-solved' : ''} ${item.id === current.id ? 'is-current' : ''}`} onClick={() => { setOpen(false); onSelect(item.id); }}><span className="exercise-number">{String(item.id).padStart(2, '0')}</span>{item.title}</button>)}</div>}
   </div>;
 }
 
