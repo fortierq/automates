@@ -69,10 +69,8 @@ function MathText({ children }: { children: string }) {
 function AutomatonLogo() {
   return <svg className="brand-logo" viewBox="0 0 32 32" role="img" aria-label="Logo Automates">
     <rect width="32" height="32" rx="7" fill="#246b49" />
-    <path d="M2.5 16h4m-2-2 2 2-2 2M15 16h3m-2-2 2 2-2 2" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="11" cy="16" r="4.5" fill="none" stroke="#fff" strokeWidth="1.5" />
-    <circle cx="24" cy="16" r="5" fill="none" stroke="#fff" strokeWidth="1.5" />
-    <circle cx="24" cy="16" r="3" fill="none" stroke="#fff" strokeWidth="1.2" />
+    <path d="M3 16h9m-3-3 3 3-3 3" fill="none" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="20" cy="16" r="8" fill="none" stroke="#fff" strokeWidth="1.7" />
   </svg>;
 }
 
