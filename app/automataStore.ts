@@ -7,14 +7,10 @@ export type StateData = { label: string; initial?: boolean; final?: boolean };
 export type StateNode = Node<StateData, 'state'>;
 
 export const starterNodes: StateNode[] = [
-  { id: 'q0', type: 'state', position: { x: 120, y: 190 }, data: { label: '0', initial: true } },
-  { id: 'q1', type: 'state', position: { x: 410, y: 190 }, data: { label: '1', final: true } },
+  { id: 'q0', type: 'state', position: { x: 180, y: 200 }, data: { label: '0', initial: true } },
 ];
 
-export const starterEdges: Edge[] = [
-  { id: 'q0-q1-a', source: 'q0', target: 'q1', label: 'a', type: 'automaton' },
-  { id: 'q1-q1-b', source: 'q1', target: 'q1', label: 'b', type: 'automaton' },
-];
+export const starterEdges: Edge[] = [];
 
 type GraphStore = {
   nodes: StateNode[];
