@@ -6,6 +6,7 @@ import {
   Background,
   BackgroundVariant,
   BaseEdge,
+  ConnectionMode,
   Controls,
   EdgeLabelRenderer,
   Handle,
@@ -81,12 +82,21 @@ function InlineMathText({ children }: { children: string }) {
 }
 
 function State({ data, selected, isConnectable }: NodeProps<StateNode>) {
+  const connectionRole = data.connectionRole;
   return (
-    <div className={`flow-state ${data.final ? 'is-final' : ''} ${selected ? 'is-selected' : ''}`}>
+    <div className={`flow-state ${data.final ? 'is-final' : ''} ${selected ? 'is-selected' : ''} ${connectionRole === 'source' ? 'is-transition-source' : ''}`}>
       {data.initial && <span className="initial-marker">→</span>}
-      <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
+      <Handle
+        className="state-surface-connector"
+        id="surface"
+        type="source"
+        position={Position.Right}
+        isConnectable={isConnectable && !!connectionRole}
+        isConnectableStart={connectionRole === 'source'}
+        isConnectableEnd={!!connectionRole}
+        style={{ pointerEvents: connectionRole ? 'all' : 'none' }}
+      />
       <span>{data.label}</span>
-      <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
     </div>
   );
 }
@@ -632,7 +642,14 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [transitionSourceId, setTransitionSourceId] = useState<string | null>(null);
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
+  const previousNodes = useRef(nodes);
+
+  useEffect(() => {
+    if (previousNodes.current !== nodes) setTransitionSourceId(null);
+    previousNodes.current = nodes;
+  }, [nodes]);
 
   const toggleNode = useCallback((id: string, field: 'initial' | 'final') => {
     setNodes(nodes.map((node) => ({ ...node, data: { ...node.data, [field]: field === 'initial' ? (node.id === id ? !node.data.initial : false) : node.id === id ? !node.data.final : node.data.final } })));
@@ -677,7 +694,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           <input id="state-label" className="text-input mono" value={selectedNode.data.label} onChange={(event) => setNodes(nodes.map((node) => node.id === selectedNode.id ? { ...node, data: { ...node.data, label: event.target.value } } : node))} />
           <label className="check-row"><input type="checkbox" checked={!!selectedNode.data.initial} onChange={() => toggleNode(selectedNode.id, 'initial')} /><span>État initial</span></label>
           <label className="check-row"><input type="checkbox" checked={!!selectedNode.data.final} onChange={() => toggleNode(selectedNode.id, 'final')} /><span>État final</span></label>
-          <button className="danger-link" onClick={() => { setNodes(nodes.filter((node) => node.id !== selectedNode.id)); setEdges(edges.filter((edge) => edge.source !== selectedNode.id && edge.target !== selectedNode.id)); setSelectedNodeId(null); }}><Trash2 /> Supprimer l’état</button>
+          <button className="danger-link" onClick={() => { setNodes(nodes.filter((node) => node.id !== selectedNode.id)); setEdges(edges.filter((edge) => edge.source !== selectedNode.id && edge.target !== selectedNode.id)); setSelectedNodeId(null); setTransitionSourceId(null); }}><Trash2 /> Supprimer l’état</button>
         </div>
       ) : selectedEdge ? (
         <div className="properties-form">
@@ -687,27 +704,29 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
           <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
         </div>
-      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état, puis reliez ses poignées. Sur écran tactile, touchez la poignée de départ puis celle d’arrivée.</p></div>}
+      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état. Pour une transition, double-cliquez l’état de départ, puis faites-le glisser vers l’état d’arrivée.</p></div>}
     </div>
   </>;
   const footer = <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger LaTeX"><Download /></button></div>;
 
   return <Workspace sidebar={sidebar} footer={footer}>
         <ReactFlow<StateNode, Edge>
-          nodes={nodes.map((node) => ({ ...node, selected: node.id === selectedNodeId }))}
+          nodes={nodes.map((node) => ({ ...node, draggable: !transitionSourceId, selected: node.id === selectedNodeId, data: { ...node.data, connectionRole: transitionSourceId ? (node.id === transitionSourceId ? 'source' : 'target') : undefined } }))}
           edges={routedEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           onInit={(instance) => { flow.current = instance; }}
           onNodesChange={(changes) => setNodes(applyNodeChanges(changes, nodes) as StateNode[])}
           onEdgesChange={(changes) => setEdges(applyEdgeChanges(changes, edges))}
-          onConnect={(connection: Connection) => setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: defaultSymbol, type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }])}
+          onConnect={(connection: Connection) => { setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: defaultSymbol, type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }]); setTransitionSourceId(null); }}
+          onConnectEnd={() => setTransitionSourceId(null)}
           onNodeClick={onNodeClick}
+          onNodeDoubleClick={(event, node) => { event.stopPropagation(); setTransitionSourceId(node.id); setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
           onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
-          onPaneClick={(event) => { setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
-          onNodesDelete={(deleted) => { if (deleted.some((node) => node.id === selectedNodeId)) setSelectedNodeId(null); }}
+          onPaneClick={(event) => { setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
+          onNodesDelete={(deleted) => { if (deleted.some((node) => node.id === selectedNodeId)) setSelectedNodeId(null); if (deleted.some((node) => node.id === transitionSourceId)) setTransitionSourceId(null); }}
           onEdgesDelete={(deleted) => { if (deleted.some((edge) => edge.id === selectedEdgeId)) setSelectedEdgeId(null); }}
-          fitView minZoom={0.3} maxZoom={2} connectOnClick connectionRadius={30} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
+          fitView minZoom={0.3} maxZoom={2} connectionMode={ConnectionMode.Loose} connectOnClick={false} connectionRadius={40} zoomOnDoubleClick={false} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cdd6ce" />
           <Controls showInteractive={false} position="top-right" />

@@ -3,7 +3,7 @@
 import type { Edge, Node } from '@xyflow/react';
 import { create } from 'zustand';
 
-export type StateData = { label: string; initial?: boolean; final?: boolean };
+export type StateData = { label: string; initial?: boolean; final?: boolean; connectionRole?: 'source' | 'target' };
 export type StateNode = Node<StateData, 'state'>;
 
 export const starterNodes: StateNode[] = [
