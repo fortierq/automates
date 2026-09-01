@@ -644,6 +644,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [transitionSourceId, setTransitionSourceId] = useState<string | null>(null);
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
+  const lastNodeClick = useRef<{ id: string; at: number } | null>(null);
   const previousNodes = useRef(nodes);
 
   useEffect(() => {
@@ -664,6 +665,14 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   }, [nodes, setNodes]);
 
   const onNodeClick: NodeMouseHandler<StateNode> = (_, node) => {
+    const now = Date.now();
+    const previousClick = lastNodeClick.current;
+    if (previousClick?.id === node.id && now - previousClick.at < 450) {
+      setTransitionSourceId(node.id);
+      lastNodeClick.current = null;
+    } else {
+      lastNodeClick.current = { id: node.id, at: now };
+    }
     setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
   };
@@ -721,9 +730,8 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           onConnect={(connection: Connection) => { setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: defaultSymbol, type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }]); setTransitionSourceId(null); }}
           onConnectEnd={() => setTransitionSourceId(null)}
           onNodeClick={onNodeClick}
-          onNodeDoubleClick={(event, node) => { event.stopPropagation(); setTransitionSourceId(node.id); setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
           onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
-          onPaneClick={(event) => { setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
+          onPaneClick={(event) => { lastNodeClick.current = null; setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
           onNodesDelete={(deleted) => { if (deleted.some((node) => node.id === selectedNodeId)) setSelectedNodeId(null); if (deleted.some((node) => node.id === transitionSourceId)) setTransitionSourceId(null); }}
           onEdgesDelete={(deleted) => { if (deleted.some((edge) => edge.id === selectedEdgeId)) setSelectedEdgeId(null); }}
           fitView minZoom={0.3} maxZoom={2} connectionMode={ConnectionMode.Loose} connectOnClick={false} connectionRadius={40} zoomOnDoubleClick={false} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
