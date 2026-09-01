@@ -172,12 +172,12 @@ const alphabetAB = ['a', 'b'];
 
 const languageExercises: LanguageExerciseDefinition[] = [
   {
-    id: 1, title: 'Se terminer par a', prompt: 'Ensemble des mots tels que le dernier symbole est un $a$.', alphabet: alphabetAB,
+    id: 1, title: 'Termine par a', prompt: 'Ensemble des mots tels que le dernier symbole est un $a$.', alphabet: alphabetAB,
     accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no',
     isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no',
   },
   {
-    id: 2, title: 'Contenir le facteur ab', prompt: 'Ensemble des mots tels que le facteur $ab$ apparaît.', alphabet: alphabetAB,
+    id: 2, title: 'C le facteur ab', prompt: 'Ensemble des mots tels que le facteur $ab$ apparaît.', alphabet: alphabetAB,
     accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], initial: '0',
     isFinal: (state) => state === '2', transition: (state, symbol) => state === '2' ? '2' : state === '1' && symbol === 'b' ? '2' : symbol === 'a' ? '1' : '0',
   },
@@ -247,7 +247,7 @@ const languageRegexExercises: LanguageExerciseDefinition[] = [
     transition: (state, symbol) => state === 'dead' || (state === '2' && symbol !== 'c') ? 'dead' : String((Number(state) + 1) % 3),
   },
   {
-    id: 3, title: 'Terminer par 0 sans 111', prompt: 'Ensemble des mots tels que le dernier symbole est $0$ et que le facteur $111$ n’apparaît pas.', alphabet: ['0', '1'],
+    id: 3, title: 'Termine par 0 sans 111', prompt: 'Ensemble des mots tels que le dernier symbole est $0$ et que le facteur $111$ n’apparaît pas.', alphabet: ['0', '1'],
     accepted: ['0', '10', '110', '1010'], rejected: ['', '1', '1110', '1101'], initial: 'start',
     isFinal: (state) => state === 'zero',
     transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (symbol === '0') return 'zero'; if (state === 'one2') return 'dead'; return state === 'one1' ? 'one2' : 'one1'; },
