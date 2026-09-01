@@ -608,7 +608,7 @@ function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRest
 
 function RegexAnswer({ id, value, onChange, onCheck }: { id: string; value: string; onChange: (value: string) => void; onCheck: () => void }) {
   return <div className="regex-answer">
-    <input id={id} className="regex-input" aria-label="Votre expression" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Utiliser *, |, e, (...)" />
+    <input id={id} className="regex-input" aria-label="Votre expression" value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onCheck(); }} placeholder="Expression régulière : *, |, e, (, )" />
   </div>;
 }
 
