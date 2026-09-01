@@ -83,9 +83,37 @@ function InlineMathText({ children }: { children: string }) {
 
 function State({ data, selected, isConnectable }: NodeProps<StateNode>) {
   const connectionRole = data.connectionRole;
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+    touchStart.current = null;
+  }, []);
+
+  useEffect(() => cancelLongPress, [cancelLongPress]);
+
   return (
-    <div className={`flow-state ${data.final ? 'is-final' : ''} ${selected ? 'is-selected' : ''} ${connectionRole === 'source' ? 'is-transition-source' : ''}`}>
+    <div
+      className={`flow-state ${data.final ? 'is-final' : ''} ${selected ? 'is-selected' : ''} ${connectionRole === 'source' ? 'is-transition-source' : ''}`}
+      onPointerDownCapture={(event) => {
+        if (event.pointerType !== 'touch' || connectionRole) return;
+        touchStart.current = { x: event.clientX, y: event.clientY };
+        longPressTimer.current = setTimeout(() => {
+          data.onLongPress?.();
+          navigator.vibrate?.(12);
+          longPressTimer.current = null;
+        }, 450);
+      }}
+      onPointerMoveCapture={(event) => {
+        const start = touchStart.current;
+        if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) cancelLongPress();
+      }}
+      onPointerUpCapture={cancelLongPress}
+      onPointerCancelCapture={cancelLongPress}
+    >
       {data.initial && <span className="initial-marker">→</span>}
+      <span>{data.label}</span>
       <Handle
         className="state-surface-connector"
         id="surface"
@@ -96,7 +124,6 @@ function State({ data, selected, isConnectable }: NodeProps<StateNode>) {
         isConnectableEnd={!!connectionRole}
         style={{ pointerEvents: connectionRole ? 'all' : 'none' }}
       />
-      <span>{data.label}</span>
     </div>
   );
 }
@@ -644,7 +671,17 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [transitionSourceId, setTransitionSourceId] = useState<string | null>(null);
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
+  const paneLongPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const paneTouchStart = useRef<{ x: number; y: number } | null>(null);
   const previousNodes = useRef(nodes);
+
+  const cancelPaneLongPress = useCallback(() => {
+    if (paneLongPressTimer.current) clearTimeout(paneLongPressTimer.current);
+    paneLongPressTimer.current = null;
+    paneTouchStart.current = null;
+  }, []);
+
+  useEffect(() => cancelPaneLongPress, [cancelPaneLongPress]);
 
   useEffect(() => {
     if (previousNodes.current !== nodes) setTransitionSourceId(null);
@@ -667,6 +704,11 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
     setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
   };
+  const armTransition = useCallback((nodeId: string) => {
+    setTransitionSourceId(nodeId);
+    setSelectedNodeId(nodeId);
+    setSelectedEdgeId(null);
+  }, []);
 
   const selectedNode = nodes.find((node) => node.id === selectedNodeId);
   const selectedEdge = edges.find((edge) => edge.id === selectedEdgeId);
@@ -704,14 +746,29 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
           <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
         </div>
-      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Clic droit dans le vide pour ajouter un état. Pour une transition, clic droit sur l’état de départ, puis glissez-le vers l’état d’arrivée.</p></div>}
+      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Clic droit dans le vide pour ajouter un état, ou sur un état puis glissez vers l’arrivée. Sur écran tactile, utilisez un appui long.</p></div>}
     </div>
   </>;
   const footer = <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger LaTeX"><Download /></button></div>;
 
   return <Workspace sidebar={sidebar} footer={footer}>
         <ReactFlow<StateNode, Edge>
-          nodes={nodes.map((node) => ({ ...node, draggable: !transitionSourceId, selected: node.id === selectedNodeId, data: { ...node.data, connectionRole: transitionSourceId ? (node.id === transitionSourceId ? 'source' : 'target') : undefined } }))}
+          onPointerDownCapture={(event) => {
+            if (event.pointerType !== 'touch' || !(event.target instanceof Element) || !event.target.classList.contains('react-flow__pane')) return;
+            paneTouchStart.current = { x: event.clientX, y: event.clientY };
+            paneLongPressTimer.current = setTimeout(() => {
+              addState(event.clientX, event.clientY);
+              navigator.vibrate?.(12);
+              paneLongPressTimer.current = null;
+            }, 450);
+          }}
+          onPointerMoveCapture={(event) => {
+            const start = paneTouchStart.current;
+            if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) cancelPaneLongPress();
+          }}
+          onPointerUpCapture={cancelPaneLongPress}
+          onPointerCancelCapture={cancelPaneLongPress}
+          nodes={nodes.map((node) => ({ ...node, draggable: !transitionSourceId, selected: node.id === selectedNodeId, data: { ...node.data, connectionRole: transitionSourceId ? (node.id === transitionSourceId ? 'source' : 'target') : undefined, onLongPress: () => armTransition(node.id) } }))}
           edges={routedEdges}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
@@ -721,7 +778,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           onConnect={(connection: Connection) => { setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: defaultSymbol, type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }]); setTransitionSourceId(null); }}
           onConnectEnd={() => setTransitionSourceId(null)}
           onNodeClick={onNodeClick}
-          onNodeContextMenu={(event, node) => { event.preventDefault(); event.stopPropagation(); setTransitionSourceId(node.id); setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
+          onNodeContextMenu={(event, node) => { event.preventDefault(); event.stopPropagation(); armTransition(node.id); }}
           onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
           onPaneClick={() => { setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); }}
           onPaneContextMenu={(event) => { event.preventDefault(); setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); addState(event.clientX, event.clientY); }}
