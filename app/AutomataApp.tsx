@@ -8,6 +8,7 @@ import {
   BaseEdge,
   Controls,
   EdgeLabelRenderer,
+  getBezierPath,
   Handle,
   MarkerType,
   Position,
@@ -668,13 +669,12 @@ function Workspace({ sidebar, footer, canvasClassName = '', children }: { sideba
   </section>;
 }
 
-function TransitionPreview({ source, target, pointer, flow, container, label }: {
+function TransitionPreview({ source, target, pointer, flow, container }: {
   source: StateNode;
   target?: StateNode;
   pointer: { x: number; y: number };
   flow: ReactFlowInstance<StateNode, Edge>;
   container: HTMLDivElement;
-  label: string;
 }) {
   const rect = container.getBoundingClientRect();
   const zoom = flow.getZoom();
@@ -686,31 +686,24 @@ function TransitionPreview({ source, target, pointer, flow, container, label }: 
   };
   const sourceCenter = center(source);
   let path: string;
-  let labelX: number;
-  let labelY: number;
 
   if (target?.id === source.id) {
     const lift = 78 * zoom;
     path = `M ${sourceCenter.x + sourceCenter.radius} ${sourceCenter.y} C ${sourceCenter.x + sourceCenter.radius + 48 * zoom} ${sourceCenter.y - lift}, ${sourceCenter.x - sourceCenter.radius - 48 * zoom} ${sourceCenter.y - lift}, ${sourceCenter.x - sourceCenter.radius - 3 * zoom} ${sourceCenter.y}`;
-    labelX = sourceCenter.x;
-    labelY = sourceCenter.y - lift + 7 * zoom;
   } else {
     const destination = target ? center(target) : { x: pointer.x - rect.left, y: pointer.y - rect.top, radius: 0 };
-    const dx = destination.x - sourceCenter.x;
-    const dy = destination.y - sourceCenter.y;
-    const length = Math.hypot(dx, dy) || 1;
-    const start = { x: sourceCenter.x + dx / length * sourceCenter.radius, y: sourceCenter.y + dy / length * sourceCenter.radius };
-    const endGap = target ? destination.radius + 3 * zoom : 0;
-    const end = { x: destination.x - dx / length * endGap, y: destination.y - dy / length * endGap };
-    path = `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
-    labelX = (start.x + end.x) / 2;
-    labelY = (start.y + end.y) / 2 - 12;
+    [path] = getBezierPath({
+      sourceX: sourceCenter.x + sourceCenter.radius,
+      sourceY: sourceCenter.y,
+      sourcePosition: Position.Right,
+      targetX: target ? destination.x - destination.radius : destination.x,
+      targetY: destination.y,
+      targetPosition: Position.Left,
+    });
   }
 
   return <svg className="transition-preview" aria-hidden="true">
-    <defs><marker id="preview-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M 0 0 L 8 4 L 0 8 z" /></marker></defs>
-    <path className="transition-preview-path" d={path} markerEnd="url(#preview-arrow)" />
-    <text className="transition-preview-label" x={labelX} y={labelY}>{label}</text>
+    <path className="transition-preview-path" d={path} />
   </svg>;
 }
 
@@ -866,7 +859,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cdd6ce" />
           <Controls showInteractive={false} position="top-right" />
         </ReactFlow>
-        {previewSource && transitionPointer && previewFlow && editorCanvas && <TransitionPreview source={previewSource} target={previewTarget} pointer={transitionPointer} flow={previewFlow} container={editorCanvas} label={defaultSymbol} />}
+        {previewSource && transitionPointer && previewFlow && editorCanvas && <TransitionPreview source={previewSource} target={previewTarget} pointer={transitionPointer} flow={previewFlow} container={editorCanvas} />}
       </div>
   </Workspace>;
 }
