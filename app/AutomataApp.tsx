@@ -621,7 +621,6 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   const { nodes, edges, setNodes, setEdges } = useGraphStore();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [notice, setNotice] = useState('Enregistré localement');
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
 
   const toggleNode = useCallback((id: string, field: 'initial' | 'final') => {
@@ -646,8 +645,6 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   const routedEdges = useRoutedEdges(edges, selectedEdgeId);
   const copyLatex = async () => {
     await navigator.clipboard.writeText(toLatex(nodes, edges));
-    setNotice('LaTeX copié');
-    window.setTimeout(() => setNotice('Enregistré localement'), 1800);
   };
 
   const downloadLatex = () => {
@@ -685,7 +682,6 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   const footer = <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger LaTeX"><Download /></button></div>;
 
   return <Workspace sidebar={sidebar} footer={footer}>
-        <div className="canvas-status"><span>{notice}</span></div>
         <ReactFlow<StateNode, Edge>
           nodes={nodes.map((node) => ({ ...node, selected: node.id === selectedNodeId }))}
           edges={routedEdges}
@@ -847,7 +843,7 @@ export default function AutomataApp() {
     <ReactFlowProvider>
       <main className="app-shell">
         <header className="topbar">
-          <button className="brand-button" onClick={() => setSection('language')}><span className="brand-mark">A</span><span className="brand-copy"><strong>Automates</strong><span>MP · MPI</span></span></button>
+          <button className="brand-button" onClick={() => setSection('language')}><span className="brand-copy"><strong>Automates</strong><span>MP · MPI</span></span></button>
           <nav aria-label="Sections principales">{nav.map(([id, label]) => <button key={id} className={`nav-item ${section === id ? 'active' : ''}`} onClick={() => setSection(id)}>{label}</button>)}</nav>
           <div className="topbar-actions">
             <a href="https://mpi-lamartin.github.io/mpi-info" target="_blank" rel="noreferrer">MPI</a>

@@ -2,7 +2,6 @@
 
 import type { Edge, Node } from '@xyflow/react';
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 
 export type StateData = { label: string; initial?: boolean; final?: boolean };
 export type StateNode = Node<StateData, 'state'>;
@@ -25,28 +24,10 @@ type GraphStore = {
   reset: (empty?: boolean) => void;
 };
 
-export const useGraphStore = create<GraphStore>()(
-  persist(
-    (set) => ({
-      nodes: starterNodes,
-      edges: starterEdges,
-      setNodes: (nodes) => set({ nodes }),
-      setEdges: (edges) => set({ edges }),
-      reset: (empty = false) => set({ nodes: empty ? [] : starterNodes, edges: empty ? [] : starterEdges }),
-    }),
-    {
-      name: 'automates-mpi-graph',
-      version: 1,
-      migrate: (persisted) => {
-        const state = persisted as GraphStore;
-        return {
-          ...state,
-          nodes: state.nodes.map((node) => {
-            const match = node.data.label.match(/^q(\d+)$/);
-            return match ? { ...node, data: { ...node.data, label: match[1] } } : node;
-          }),
-        };
-      },
-    },
-  ),
-);
+export const useGraphStore = create<GraphStore>((set) => ({
+  nodes: starterNodes,
+  edges: starterEdges,
+  setNodes: (nodes) => set({ nodes }),
+  setEdges: (edges) => set({ edges }),
+  reset: (empty = false) => set({ nodes: empty ? [] : starterNodes, edges: empty ? [] : starterEdges }),
+}));
