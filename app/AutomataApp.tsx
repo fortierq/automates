@@ -8,7 +8,9 @@ import {
   BaseEdge,
   Controls,
   EdgeLabelRenderer,
+  Handle,
   MarkerType,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   useInternalNode,
@@ -122,6 +124,8 @@ function State({ data, selected }: NodeProps<StateNode>) {
     >
       {data.initial && <span className="initial-marker">→</span>}
       <span>{data.label}</span>
+      <Handle className="edge-anchor" type="source" position={Position.Right} isConnectable={false} />
+      <Handle className="edge-anchor" type="target" position={Position.Left} isConnectable={false} />
     </div>
   );
 }

@@ -31,6 +31,7 @@ h1 { font-size:19px; line-height:1.25; margin:7px 0 6px; letter-spacing:-.025em;
 .flow-state { position:relative; width:68px; height:68px; display:grid; place-items:center; border:2px solid #33423a; border-radius:50%; background:#fff; font-family:var(--font-geist-mono); font-size:14px; box-shadow:0 2px 7px rgba(30,50,37,.06); }
 .flow-state.is-final::after { content:''; position:absolute; inset:5px; border:1.5px solid #33423a; border-radius:50%; }.flow-state.is-selected { border-color:var(--green); box-shadow:0 0 0 4px rgba(36,107,73,.12); }.flow-state.is-selected::after { border-color:var(--green); }
 .flow-state .react-flow__handle { width:7px; height:7px; border:1px solid var(--green); background:#fff; opacity:0; transition:.15s; }.flow-state:hover .react-flow__handle,.flow-state.is-selected .react-flow__handle { opacity:1; }.initial-marker { position:absolute; right:calc(100% + 6px); font-size:27px; color:#33423a; }
+.flow-state .react-flow__handle.edge-anchor { opacity:0!important; pointer-events:none; }
 .edge-label { position:absolute; z-index:3; min-width:20px; padding:2px 5px; border:1px solid transparent; border-radius:4px; background:var(--paper); color:var(--ink); text-align:center; font:12px var(--font-geist-mono); pointer-events:none; }
 .edge-label.is-selected { border-color:#75a78a; background:#fff; color:var(--green); font-weight:700; box-shadow:0 2px 8px rgba(36,107,73,.12); }
 .react-flow__edge-interaction { cursor:pointer; }
