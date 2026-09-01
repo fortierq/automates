@@ -66,6 +66,12 @@ function MathText({ children }: { children: string }) {
   return <span className="math" dangerouslySetInnerHTML={{ __html: katex.renderToString(children, { throwOnError: false }) }} />;
 }
 
+function InlineMathText({ children }: { children: string }) {
+  return <>{children.split(/(\$[^$]+\$)/g).map((part, index) => part.startsWith('$') && part.endsWith('$')
+    ? <MathText key={index}>{part.slice(1, -1)}</MathText>
+    : part)}</>;
+}
+
 function State({ data, selected, isConnectable }: NodeProps<StateNode>) {
   return (
     <div className={`flow-state ${data.final ? 'is-final' : ''} ${selected ? 'is-selected' : ''}`}>
@@ -158,62 +164,62 @@ const alphabetAB = ['a', 'b'];
 
 const languageExercises: LanguageExerciseDefinition[] = [
   {
-    id: 1, title: 'Se terminer par a', prompt: 'Le dernier symbole du mot est un a.', alphabet: alphabetAB,
+    id: 1, title: 'Se terminer par a', prompt: 'Ensemble des mots tels que le dernier symbole est un $a$.', alphabet: alphabetAB,
     accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no',
     isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no',
   },
   {
-    id: 2, title: 'Contenir le facteur ab', prompt: 'Le mot contient deux lettres consécutives ab.', alphabet: alphabetAB,
+    id: 2, title: 'Contenir le facteur ab', prompt: 'Ensemble des mots tels que le facteur $ab$ apparaît.', alphabet: alphabetAB,
     accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], initial: '0',
     isFinal: (state) => state === '2', transition: (state, symbol) => state === '2' ? '2' : state === '1' && symbol === 'b' ? '2' : symbol === 'a' ? '1' : '0',
   },
   {
-    id: 3, title: 'Exactement deux a', prompt: 'Le mot contient exactement deux occurrences de la lettre a.', alphabet: alphabetAB,
+    id: 3, title: 'Exactement deux a', prompt: 'Ensemble des mots tels que la lettre $a$ apparaît exactement deux fois.', alphabet: alphabetAB,
     accepted: ['aa', 'aba', 'bbaab'], rejected: ['', 'a', 'aaa'], initial: '0',
     isFinal: (state) => state === '2', transition: (state, symbol) => symbol === 'b' ? state : String(Math.min(3, Number(state) + 1)),
   },
   {
-    id: 4, title: 'Jamais trois bits identiques', prompt: 'Le mot ne contient ni 000 ni 111 comme facteur.', alphabet: ['0', '1'],
+    id: 4, title: 'Jamais trois bits identiques', prompt: 'Ensemble des mots tels que ni $000$ ni $111$ n’apparaît comme facteur.', alphabet: ['0', '1'],
     accepted: ['', '0011', '01010', '1100'], rejected: ['000', '111', '10001'], initial: 'start',
     isFinal: (state) => state !== 'dead', transition: (state, symbol) => { if (state === 'dead' || state === symbol.repeat(2)) return 'dead'; return state.endsWith(symbol) ? symbol.repeat(2) : symbol; },
   },
   {
-    id: 5, title: 'Troisième bit depuis la fin', prompt: 'Le troisième bit en partant de la fin est un 1.', alphabet: ['0', '1'],
+    id: 5, title: 'Troisième bit depuis la fin', prompt: 'Ensemble des mots tels que le troisième bit en partant de la fin est $1$.', alphabet: ['0', '1'],
     accepted: ['100', '101', '1110', '01101'], rejected: ['', '10', '010', '1000'], initial: '',
     isFinal: (state) => state.length >= 3 && state.at(-3) === '1', transition: (state, symbol) => (state + symbol).slice(-3),
   },
   {
-    id: 6, title: 'Un seul des deux facteurs', prompt: 'Le mot contient exactement l’un des deux facteurs aba et bab.', alphabet: alphabetAB,
+    id: 6, title: 'Un seul des deux facteurs', prompt: 'Ensemble des mots tels qu’exactement l’un des facteurs $aba$ et $bab$ apparaît.', alphabet: alphabetAB,
     accepted: ['aba', 'bab', 'aabaa', 'bbabb'], rejected: ['', 'abba', 'abab', 'baba'], initial: '0|',
     isFinal: (state) => state.startsWith('1|') || state.startsWith('2|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; },
   },
   {
-    id: 7, title: 'Lettres c assorties', prompt: 'Chaque c est immédiatement précédé et suivi de la même lettre : aca ou bcb.', alphabet: ['a', 'b', 'c'],
+    id: 7, title: 'Lettres c assorties', prompt: 'Ensemble des mots tels que chaque $c$ est immédiatement précédé et suivi de la même lettre : $aca$ ou $bcb$.', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'ab', 'aca', 'bcb', 'abcbaca'], rejected: ['c', 'ac', 'acb', 'cca'], initial: 'none',
     isFinal: (state) => state === 'none' || state.startsWith('last-'), transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'need-a' || state === 'need-b') return symbol === state.at(-1) ? `last-${symbol}` : 'dead'; if (symbol === 'c') return state === 'last-a' ? 'need-a' : state === 'last-b' ? 'need-b' : 'dead'; return `last-${symbol}`; },
   },
   {
-    id: 8, title: 'Parités opposées autour de #', prompt: 'Le mot contient exactement un #. Les nombres de 1 placés avant et après # ont des parités différentes.', alphabet: ['0', '1', '#'],
+    id: 8, title: 'Parités opposées autour de #', prompt: 'Ensemble des mots tels que $\\#$ apparaît exactement une fois et que les nombres de $1$ avant et après $\\#$ ont des parités différentes.', alphabet: ['0', '1', '#'],
     accepted: ['#1', '1#', '10#11', '11#1'], rejected: ['', '#', '1#1', '#11', '1#0#'], initial: 'pre:0',
     isFinal: (state) => { const parts = state.split(':'); return parts[0] === 'post' && parts[1] !== parts[2]; }, transition: (state, symbol) => { if (state === 'dead') return 'dead'; const parts = state.split(':'); if (parts[0] === 'pre') { if (symbol === '#') return `post:${parts[1]}:0`; return `pre:${symbol === '1' ? 1 - Number(parts[1]) : parts[1]}`; } if (symbol === '#') return 'dead'; return `post:${parts[1]}:${symbol === '1' ? 1 - Number(parts[2]) : parts[2]}`; },
   },
   {
-    id: 9, title: 'Première lettre inédite après #', prompt: 'Le mot contient exactement un # et au moins un bit après lui. Le premier bit après # n’est jamais apparu avant #.', alphabet: ['0', '1', '#'],
+    id: 9, title: 'Première lettre inédite après #', prompt: 'Ensemble des mots tels que $\\#$ apparaît exactement une fois, est suivi d’au moins un bit, et que le premier bit après $\\#$ n’apparaît pas avant lui.', alphabet: ['0', '1', '#'],
     accepted: ['#0', '#101', '0#1', '000#1'], rejected: ['#', '0#0', '01#0', '0#1#'], initial: 'pre:0',
     isFinal: (state) => state === 'ok', transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'ok') return symbol === '#' ? 'dead' : 'ok'; const [side, rawMask] = state.split(':'); const mask = Number(rawMask); if (side === 'pre') { if (symbol === '#') return `need:${mask}`; return `pre:${mask | (symbol === '0' ? 1 : 2)}`; } if (symbol === '#') return 'dead'; const bit = symbol === '0' ? 1 : 2; return mask & bit ? 'dead' : 'ok'; },
   },
   {
-    id: 10, title: 'Multiples de trois en binaire', prompt: 'Reconnaître les écritures binaires non vides des entiers divisibles par trois. Les zéros initiaux sont autorisés.', alphabet: ['0', '1'],
+    id: 10, title: 'Multiples de trois en binaire', prompt: 'Ensemble des mots non vides tels que leur valeur binaire est divisible par $3$ ; les zéros initiaux sont autorisés.', alphabet: ['0', '1'],
     accepted: ['0', '11', '110', '1001'], rejected: ['', '1', '10', '101'], initial: 'start',
     isFinal: (state) => state === 'r0', transition: (state, symbol) => { const remainder = state === 'start' ? 0 : Number(state[1]); return `r${(remainder * 2 + Number(symbol)) % 3}`; },
   },
   {
-    id: 11, title: 'Trois parités synchronisées', prompt: 'Les nombres de a, de b et de c ont tous la même parité.', alphabet: ['a', 'b', 'c'],
+    id: 11, title: 'Trois parités synchronisées', prompt: 'Ensemble des mots tels que les nombres de $a$, de $b$ et de $c$ ont tous la même parité.', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'abc', 'aabbcc', 'abccba'], rejected: ['a', 'ab', 'abbc'], initial: '000',
     isFinal: (state) => state === '000' || state === '111', transition: (state, symbol) => { const index = ['a', 'b', 'c'].indexOf(symbol); return state.split('').map((bit, position) => position === index ? String(1 - Number(bit)) : bit).join(''); },
   },
   {
-    id: 12, title: 'Congruence croisée modulo cinq', prompt: 'Le nombre de a est congru au double du nombre de b modulo cinq. La lettre c est neutre.', alphabet: ['a', 'b', 'c'],
+    id: 12, title: 'Double modulo cinq', prompt: 'Ensemble des mots tels que le nombre de $a$ est congru au double du nombre de $b$ modulo $5$ ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'c', 'aab', 'bbbbb', 'aaaaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
     isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : symbol === 'b' ? 3 : 0)) % 5),
   },
@@ -221,61 +227,61 @@ const languageExercises: LanguageExerciseDefinition[] = [
 
 const languageRegexExercises: LanguageExerciseDefinition[] = [
   {
-    id: 1, title: 'Une seule occurrence de ab', prompt: 'Les mots contiennent exactement une occurrence du facteur ab.', alphabet: alphabetAB,
+    id: 1, title: 'Une seule occurrence de ab', prompt: 'Ensemble des mots tels que le facteur $ab$ apparaît exactement une fois.', alphabet: alphabetAB,
     accepted: ['ab', 'aab', 'abba', 'baba'], rejected: ['', 'a', 'bb', 'abab'], initial: '0:0',
     isFinal: (state) => state.startsWith('1:'),
     transition: (state, symbol) => { const [count, lastA] = state.split(':').map(Number); return `${Math.min(2, count + (lastA && symbol === 'b' ? 1 : 0))}:${symbol === 'a' ? 1 : 0}`; },
   },
   {
-    id: 2, title: 'Un c toutes les trois lettres', prompt: 'Chaque lettre dont la position est un multiple de trois est un c. Les positions commencent à 1.', alphabet: ['a', 'b', 'c'],
+    id: 2, title: 'Un c toutes les trois lettres', prompt: 'Ensemble des mots tels que chaque lettre dont la position est un multiple de $3$ est un $c$ ; les positions commencent à $1$.', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'a', 'cc', 'aac', 'abcaac'], rejected: ['aaa', 'abb', 'abcaba'], initial: '0',
     isFinal: (state) => state !== 'dead',
     transition: (state, symbol) => state === 'dead' || (state === '2' && symbol !== 'c') ? 'dead' : String((Number(state) + 1) % 3),
   },
   {
-    id: 3, title: 'Terminer par 0 sans 111', prompt: 'Les mots binaires se terminent par 0 et ne contiennent jamais le facteur 111.', alphabet: ['0', '1'],
+    id: 3, title: 'Terminer par 0 sans 111', prompt: 'Ensemble des mots tels que le dernier symbole est $0$ et que le facteur $111$ n’apparaît pas.', alphabet: ['0', '1'],
     accepted: ['0', '10', '110', '1010'], rejected: ['', '1', '1110', '1101'], initial: 'start',
     isFinal: (state) => state === 'zero',
     transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (symbol === '0') return 'zero'; if (state === 'one2') return 'dead'; return state === 'one1' ? 'one2' : 'one1'; },
   },
   {
-    id: 4, title: 'Lettres à compléter', prompt: 'Chaque b est immédiatement suivi d’un a, et chaque c est immédiatement suivi de ba.', alphabet: ['a', 'b', 'c'],
+    id: 4, title: 'Lettres à compléter', prompt: 'Ensemble des mots tels que chaque $b$ est immédiatement suivi d’un $a$, et chaque $c$ immédiatement suivi de $ba$.', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'a', 'ba', 'cba', 'bacba'], rejected: ['b', 'cb', 'caa', 'bb'], initial: 'ready',
     isFinal: (state) => state === 'ready',
     transition: (state, symbol) => { if (state === 'ready') return symbol === 'a' ? 'ready' : symbol === 'b' ? 'need-a' : 'need-b'; if (state === 'need-b') return symbol === 'b' ? 'need-a' : 'dead'; if (state === 'need-a') return symbol === 'a' ? 'ready' : 'dead'; return 'dead'; },
   },
   {
-    id: 5, title: 'Deux séparateurs espacés', prompt: 'Les mots contiennent exactement deux #, séparés par au moins un bit.', alphabet: ['0', '1', '#'],
+    id: 5, title: 'Deux séparateurs espacés', prompt: 'Ensemble des mots tels que $\\#$ apparaît exactement deux fois, avec au moins un bit entre les deux occurrences.', alphabet: ['0', '1', '#'],
     accepted: ['#0#', '1#1#0', '#01#11'], rejected: ['', '##', '#0', '#0#1#'], initial: 'before',
     isFinal: (state) => state === 'after',
     transition: (state, symbol) => { if (state === 'before') return symbol === '#' ? 'gap-empty' : 'before'; if (state === 'gap-empty') return symbol === '#' ? 'dead' : 'gap'; if (state === 'gap') return symbol === '#' ? 'after' : 'gap'; if (state === 'after') return symbol === '#' ? 'dead' : 'after'; return 'dead'; },
   },
   {
-    id: 6, title: 'Écart impair entre les b', prompt: 'Entre deux b consécutifs, le nombre de a est toujours impair.', alphabet: alphabetAB,
+    id: 6, title: 'Écart impair entre les b', prompt: 'Ensemble des mots tels qu’entre deux $b$ consécutifs, le nombre de $a$ est toujours impair.', alphabet: alphabetAB,
     accepted: ['', 'b', 'aba', 'bab', 'baaab'], rejected: ['bb', 'baab', 'bababb'], initial: 'none',
     isFinal: (state) => state !== 'dead',
     transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'none') return symbol === 'b' ? 'even' : 'none'; if (symbol === 'a') return state === 'even' ? 'odd' : 'even'; return state === 'odd' ? 'even' : 'dead'; },
   },
   {
-    id: 7, title: 'Deux parités de blocs', prompt: 'Chaque bloc maximal de a est de longueur paire, tandis que chaque bloc maximal de b est de longueur impaire.', alphabet: alphabetAB,
+    id: 7, title: 'Deux parités de blocs', prompt: 'Ensemble des mots tels que chaque bloc maximal de $a$ est de longueur paire et chaque bloc maximal de $b$ de longueur impaire.', alphabet: alphabetAB,
     accepted: ['', 'aa', 'b', 'aabbb', 'baab'], rejected: ['a', 'bb', 'abb', 'aabb'], initial: 'start',
     isFinal: (state) => state === 'start' || state === 'a-even' || state === 'b-odd',
     transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'start') return symbol === 'a' ? 'a-odd' : 'b-odd'; if (state === 'a-odd') return symbol === 'a' ? 'a-even' : 'dead'; if (state === 'a-even') return symbol === 'a' ? 'a-odd' : 'b-odd'; if (state === 'b-odd') return symbol === 'b' ? 'b-even' : 'a-odd'; return symbol === 'b' ? 'b-odd' : 'dead'; },
   },
   {
-    id: 8, title: 'Alphabet autorisé après #', prompt: 'Il y a exactement un #. Après celui-ci, seules des lettres déjà apparues avant # peuvent être utilisées.', alphabet: ['0', '1', '#'],
+    id: 8, title: 'Alphabet autorisé après #', prompt: 'Ensemble des mots tels que $\\#$ apparaît exactement une fois et qu’après lui, seules des lettres déjà apparues avant lui sont utilisées.', alphabet: ['0', '1', '#'],
     accepted: ['#', '0#', '01#100', '10#111'], rejected: ['', '#0', '0#1', '0#0#'], initial: 'pre:0',
     isFinal: (state) => state.startsWith('post:'),
     transition: (state, symbol) => { if (state === 'dead') return 'dead'; const [side, rawMask] = state.split(':'); const mask = Number(rawMask); if (side === 'pre') { if (symbol === '#') return `post:${mask}`; return `pre:${mask | (symbol === '0' ? 1 : 2)}`; } if (symbol === '#') return 'dead'; const bit = symbol === '0' ? 1 : 2; return mask & bit ? state : 'dead'; },
   },
   {
-    id: 9, title: 'Deux compteurs indépendants', prompt: 'Le nombre de a est multiple de trois et le nombre de b est pair. La lettre c est neutre.', alphabet: ['a', 'b', 'c'],
+    id: 9, title: 'Deux compteurs indépendants', prompt: 'Ensemble des mots tels que le nombre de $a$ est multiple de $3$ et le nombre de $b$ est pair ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'ccc', 'aaa', 'bb', 'aaabbc'], rejected: ['a', 'b', 'ab', 'aaab'], initial: '0:0',
     isFinal: (state) => state === '0:0',
     transition: (state, symbol) => { const [a, b] = state.split(':').map(Number); return symbol === 'a' ? `${(a + 1) % 3}:${b}` : symbol === 'b' ? `${a}:${1 - b}` : state; },
   },
   {
-    id: 10, title: 'Congruence croisée modulo cinq', prompt: 'Le nombre de a est congru au double du nombre de b modulo cinq. La lettre c est neutre.', alphabet: ['a', 'b', 'c'],
+    id: 10, title: 'Congruence croisée modulo cinq', prompt: 'Ensemble des mots tels que le nombre de $a$ est congru au double du nombre de $b$ modulo $5$ ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
     accepted: ['', 'c', 'aab', 'bbbbb', 'aaaaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
     isFinal: (state) => state === '0',
     transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : symbol === 'b' ? 3 : 0)) % 5),
@@ -587,7 +593,7 @@ function ExercisePanel({ exercise, exercises, solved, feedback, onSelect, onRest
     <label htmlFor={pickerId}>Exercice</label>
     <ExercisePicker id={pickerId} current={exercise} exercises={exercises} solved={solved} onSelect={onSelect} />
     <h2>{exercise.title}</h2>
-    {showLanguageDetails && <><p>{exercise.prompt}</p><ExerciseData exercise={exercise} /></>}
+    {showLanguageDetails && <><p><InlineMathText>{exercise.prompt}</InlineMathText></p><ExerciseData exercise={exercise} /></>}
     {children}
     {feedback && <Feedback {...feedback} />}
     <div className="exercise-buttons"><button className="ghost-button" onClick={onRestart}><RotateCcw /> Recommencer</button><button className="primary" onClick={onCheck}><Check /> Vérifier</button><button className="ghost-button next-exercise" disabled={exercise.id === exercises.length} onClick={() => onSelect(exercise.id + 1)}>Exercice suivant <ArrowRight /></button></div>
