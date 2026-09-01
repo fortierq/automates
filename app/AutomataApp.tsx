@@ -6,6 +6,7 @@ import {
   Background,
   BackgroundVariant,
   BaseEdge,
+  ConnectionMode,
   Controls,
   EdgeLabelRenderer,
   Handle,
@@ -84,9 +85,11 @@ function State({ data, selected, isConnectable }: NodeProps<StateNode>) {
   return (
     <div className={`flow-state ${data.final ? 'is-final' : ''} ${selected ? 'is-selected' : ''}`}>
       {data.initial && <span className="initial-marker">→</span>}
-      <Handle type="target" position={Position.Left} isConnectable={isConnectable} />
+      <Handle className="state-connector" id="top" type="source" position={Position.Top} isConnectable={isConnectable} />
+      <Handle className="state-connector" id="right" type="source" position={Position.Right} isConnectable={isConnectable} />
+      <Handle className="state-connector" id="bottom" type="source" position={Position.Bottom} isConnectable={isConnectable} />
+      <Handle className="state-connector" id="left" type="source" position={Position.Left} isConnectable={isConnectable} />
       <span>{data.label}</span>
-      <Handle type="source" position={Position.Right} isConnectable={isConnectable} />
     </div>
   );
 }
@@ -687,7 +690,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
           <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
         </div>
-      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état, puis reliez ses poignées. Sur écran tactile, touchez la poignée de départ puis celle d’arrivée.</p></div>}
+      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état. Faites glisser depuis le bord d’un état vers un autre pour créer une transition.</p></div>}
     </div>
   </>;
   const footer = <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger LaTeX"><Download /></button></div>;
@@ -707,7 +710,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           onPaneClick={(event) => { setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
           onNodesDelete={(deleted) => { if (deleted.some((node) => node.id === selectedNodeId)) setSelectedNodeId(null); }}
           onEdgesDelete={(deleted) => { if (deleted.some((edge) => edge.id === selectedEdgeId)) setSelectedEdgeId(null); }}
-          fitView minZoom={0.3} maxZoom={2} connectOnClick connectionRadius={30} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
+          fitView minZoom={0.3} maxZoom={2} connectionMode={ConnectionMode.Loose} connectOnClick connectionRadius={30} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cdd6ce" />
           <Controls showInteractive={false} position="top-right" />
