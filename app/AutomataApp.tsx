@@ -644,7 +644,6 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [transitionSourceId, setTransitionSourceId] = useState<string | null>(null);
   const flow = useRef<ReactFlowInstance<StateNode, Edge> | null>(null);
-  const lastNodeClick = useRef<{ id: string; at: number } | null>(null);
   const previousNodes = useRef(nodes);
 
   useEffect(() => {
@@ -665,14 +664,6 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
   }, [nodes, setNodes]);
 
   const onNodeClick: NodeMouseHandler<StateNode> = (_, node) => {
-    const now = Date.now();
-    const previousClick = lastNodeClick.current;
-    if (previousClick?.id === node.id && now - previousClick.at < 450) {
-      setTransitionSourceId(node.id);
-      lastNodeClick.current = null;
-    } else {
-      lastNodeClick.current = { id: node.id, at: now };
-    }
     setSelectedNodeId(node.id);
     setSelectedEdgeId(null);
   };
@@ -713,7 +704,7 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           <p className="transition-summary"><span>{nodes.find((node) => node.id === selectedEdge.source)?.data.label ?? selectedEdge.source}</span><ArrowRight /><span>{nodes.find((node) => node.id === selectedEdge.target)?.data.label ?? selectedEdge.target}</span></p>
           <button className="danger-link" onClick={() => { setEdges(edges.filter((edge) => edge.id !== selectedEdge.id)); setSelectedEdgeId(null); }}><Trash2 /> Supprimer la transition</button>
         </div>
-      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Double-cliquez pour ajouter un état. Pour une transition, double-cliquez l’état de départ, puis faites-le glisser vers l’état d’arrivée.</p></div>}
+      ) : <div className="empty-selection"><div className="empty-icon"><MousePointer2 /></div><strong>Créer et modifier</strong><p>Clic droit dans le vide pour ajouter un état. Pour une transition, clic droit sur l’état de départ, puis glissez-le vers l’état d’arrivée.</p></div>}
     </div>
   </>;
   const footer = <div className="export-actions sidebar-export"><button className="primary" onClick={copyLatex}><Clipboard /> Copier LaTeX</button><button className="secondary-square" onClick={downloadLatex} aria-label="Télécharger LaTeX"><Download /></button></div>;
@@ -730,11 +721,13 @@ function Editor({ sidebarContent, defaultSymbol = 'a' }: { sidebarContent?: Reac
           onConnect={(connection: Connection) => { setEdges([...edges, { ...connection, id: `${connection.source}-${connection.target}-${Date.now()}`, label: defaultSymbol, type: 'automaton', markerEnd: { type: MarkerType.ArrowClosed } }]); setTransitionSourceId(null); }}
           onConnectEnd={() => setTransitionSourceId(null)}
           onNodeClick={onNodeClick}
+          onNodeContextMenu={(event, node) => { event.preventDefault(); event.stopPropagation(); setTransitionSourceId(node.id); setSelectedNodeId(node.id); setSelectedEdgeId(null); }}
           onEdgeClick={(_, edge) => { setSelectedEdgeId(edge.id); setSelectedNodeId(null); }}
-          onPaneClick={(event) => { lastNodeClick.current = null; setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); if (event.detail === 2) addState(event.clientX, event.clientY); }}
+          onPaneClick={() => { setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); }}
+          onPaneContextMenu={(event) => { event.preventDefault(); setTransitionSourceId(null); setSelectedNodeId(null); setSelectedEdgeId(null); addState(event.clientX, event.clientY); }}
           onNodesDelete={(deleted) => { if (deleted.some((node) => node.id === selectedNodeId)) setSelectedNodeId(null); if (deleted.some((node) => node.id === transitionSourceId)) setTransitionSourceId(null); }}
           onEdgesDelete={(deleted) => { if (deleted.some((edge) => edge.id === selectedEdgeId)) setSelectedEdgeId(null); }}
-          fitView minZoom={0.3} maxZoom={2} connectionMode={ConnectionMode.Loose} connectOnClick={false} connectionRadius={40} zoomOnDoubleClick={false} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
+          fitView minZoom={0.3} maxZoom={2} connectionMode={ConnectionMode.Loose} connectOnClick={false} connectionRadius={40} deleteKeyCode={['Backspace', 'Delete']} defaultEdgeOptions={{ type: 'automaton' }}
         >
           <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cdd6ce" />
           <Controls showInteractive={false} position="top-right" />
