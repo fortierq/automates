@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'Automates en MPI',
   description: 'Exercices sur les automates finis.',
+  icons: { icon: '/favicon.svg' },
   openGraph: {
     title: 'Automates en MPI',
     description: 'Exercices sur les automates finis.',

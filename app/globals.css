@@ -9,6 +9,7 @@ code, .mono { font-family:var(--font-geist-mono); }
 .app-shell { min-height:100vh; display:grid; grid-template-rows:64px minmax(0,1fr); }
 .topbar { display:flex; align-items:center; gap:12px; padding:0 20px; border-bottom:1px solid var(--line); background:#fff; z-index:20; }
 .brand-button { display:flex; gap:10px; align-items:center; margin-right:40px; padding:0; border:0; background:none; cursor:pointer; text-align:left; }
+.brand-logo { width:32px; height:32px; flex:none; }
 .brand-copy { display:flex; flex-direction:column; line-height:1.1; }
 .brand-copy strong { font-size:14px; }.brand-copy span,.eyebrow { font-size:10px; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; font-weight:700; }
 nav { align-self:stretch; display:flex; gap:4px; }

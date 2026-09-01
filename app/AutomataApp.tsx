@@ -66,6 +66,16 @@ function MathText({ children }: { children: string }) {
   return <span className="math" dangerouslySetInnerHTML={{ __html: katex.renderToString(children, { throwOnError: false }) }} />;
 }
 
+function AutomatonLogo() {
+  return <svg className="brand-logo" viewBox="0 0 32 32" role="img" aria-label="Logo Automates">
+    <rect width="32" height="32" rx="7" fill="#246b49" />
+    <path d="M2.5 16h4m-2-2 2 2-2 2M15 16h3m-2-2 2 2-2 2" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="11" cy="16" r="4.5" fill="none" stroke="#fff" strokeWidth="1.5" />
+    <circle cx="24" cy="16" r="5" fill="none" stroke="#fff" strokeWidth="1.5" />
+    <circle cx="24" cy="16" r="3" fill="none" stroke="#fff" strokeWidth="1.2" />
+  </svg>;
+}
+
 function InlineMathText({ children }: { children: string }) {
   return <>{children.split(/(\$[^$]+\$)/g).map((part, index) => part.startsWith('$') && part.endsWith('$')
     ? <MathText key={index}>{part.slice(1, -1)}</MathText>
@@ -846,7 +856,7 @@ export default function AutomataApp() {
     <ReactFlowProvider>
       <main className="app-shell">
         <header className="topbar">
-          <button className="brand-button" onClick={() => setSection('language')}><span className="brand-copy"><strong>Automates</strong><span>MP · MPI</span></span></button>
+          <button className="brand-button" onClick={() => setSection('language')}><AutomatonLogo /><span className="brand-copy"><strong>Automates</strong><span>MP · MPI</span></span></button>
           <nav aria-label="Sections principales">{nav.map(([id, label]) => <button key={id} className={`nav-item ${section === id ? 'active' : ''}`} onClick={() => setSection(id)}>{label}</button>)}</nav>
           <div className="topbar-actions">
             <a href="https://mpi-lamartin.github.io/mpi-info" target="_blank" rel="noreferrer">MPI</a>
