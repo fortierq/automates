@@ -38,27 +38,17 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type StateNode, useGraphStore } from './automataStore';
+import {
+  languageExercises,
+  languageRegexExercises,
+  regexExercises,
+  type ExerciseDefinition,
+  type LanguageExerciseDefinition,
+} from './exercises';
 
 type Section = 'language' | 'language-regex' | 'regex';
 type EdgeRouteData = {
   routeOffset?: number;
-};
-type LanguageExerciseDefinition = {
-  id: number;
-  title: string;
-  prompt: string;
-  alphabet: string[];
-  accepted: string[];
-  rejected: string[];
-  initial: string;
-  isFinal: (state: string) => boolean;
-  transition: (state: string, symbol: string) => string;
-};
-type ExerciseDefinition = Pick<LanguageExerciseDefinition, 'id' | 'title' | 'prompt' | 'alphabet' | 'accepted' | 'rejected'>;
-type RegexExerciseDefinition = ExerciseDefinition & {
-  nodes: StateNode[];
-  edges: Edge[];
-  answer: string;
 };
 
 function MathText({ children }: { children: string }) {
@@ -208,204 +198,6 @@ function AutomatonEdge(props: EdgeProps<Edge>) {
 
 const nodeTypes = { state: State };
 const edgeTypes = { automaton: AutomatonEdge };
-const alphabetAB = ['a', 'b'];
-
-const languageExercises: LanguageExerciseDefinition[] = [
-  {
-    id: 1, title: 'Termine par a', prompt: 'Ensemble des mots tels que le dernier symbole est un $a$.', alphabet: alphabetAB,
-    accepted: ['a', 'ba', 'abba'], rejected: ['', 'b', 'aab'], initial: 'no',
-    isFinal: (state) => state === 'a', transition: (_, symbol) => symbol === 'a' ? 'a' : 'no',
-  },
-  {
-    id: 2, title: 'Contient le facteur ab', prompt: 'Ensemble des mots tels que le facteur $ab$ apparaît.', alphabet: alphabetAB,
-    accepted: ['ab', 'aab', 'baba'], rejected: ['', 'a', 'bbaa'], initial: '0',
-    isFinal: (state) => state === '2', transition: (state, symbol) => state === '2' ? '2' : state === '1' && symbol === 'b' ? '2' : symbol === 'a' ? '1' : '0',
-  },
-  {
-    id: 3, title: 'Exactement deux a', prompt: 'Ensemble des mots tels que la lettre $a$ apparaît exactement deux fois.', alphabet: alphabetAB,
-    accepted: ['aa', 'aba', 'bbaab'], rejected: ['', 'a', 'aaa'], initial: '0',
-    isFinal: (state) => state === '2', transition: (state, symbol) => symbol === 'b' ? state : String(Math.min(3, Number(state) + 1)),
-  },
-  {
-    id: 4, title: 'Jamais trois bits identiques', prompt: 'Ensemble des mots tels que ni $000$ ni $111$ n’apparaît comme facteur.', alphabet: ['0', '1'],
-    accepted: ['', '0011', '01010', '1100'], rejected: ['000', '111', '10001'], initial: 'start',
-    isFinal: (state) => state !== 'dead', transition: (state, symbol) => { if (state === 'dead' || state === symbol.repeat(2)) return 'dead'; return state.endsWith(symbol) ? symbol.repeat(2) : symbol; },
-  },
-  {
-    id: 5, title: 'Troisième bit depuis la fin', prompt: 'Ensemble des mots tels que le troisième bit en partant de la fin est $1$.', alphabet: ['0', '1'],
-    accepted: ['100', '101', '1110', '01101'], rejected: ['', '10', '010', '1000'], initial: '',
-    isFinal: (state) => state.length >= 3 && state.at(-3) === '1', transition: (state, symbol) => (state + symbol).slice(-3),
-  },
-  {
-    id: 6, title: 'Un seul des deux facteurs', prompt: 'Ensemble des mots tels qu’exactement l’un des facteurs $aba$ et $bab$ apparaît.', alphabet: alphabetAB,
-    accepted: ['aba', 'bab', 'aabaa', 'bbabb'], rejected: ['', 'abba', 'abab', 'baba'], initial: '0|',
-    isFinal: (state) => state.startsWith('1|') || state.startsWith('2|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; },
-  },
-  {
-    id: 7, title: 'Lettres c assorties', prompt: 'Ensemble des mots tels que chaque $c$ est immédiatement précédé et suivi de la même lettre : $aca$ ou $bcb$.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'ab', 'aca', 'bcb', 'abcbaca'], rejected: ['c', 'ac', 'acb', 'cca'], initial: 'none',
-    isFinal: (state) => state === 'none' || state.startsWith('last-'), transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'need-a' || state === 'need-b') return symbol === state.at(-1) ? `last-${symbol}` : 'dead'; if (symbol === 'c') return state === 'last-a' ? 'need-a' : state === 'last-b' ? 'need-b' : 'dead'; return `last-${symbol}`; },
-  },
-  {
-    id: 8, title: 'Parités opposées autour de #', prompt: 'Ensemble des mots tels que $\\#$ apparaît exactement une fois et que les nombres de $1$ avant et après $\\#$ ont des parités différentes.', alphabet: ['0', '1', '#'],
-    accepted: ['#1', '1#', '10#11', '11#1'], rejected: ['', '#', '1#1', '#11', '1#0#'], initial: 'pre:0',
-    isFinal: (state) => { const parts = state.split(':'); return parts[0] === 'post' && parts[1] !== parts[2]; }, transition: (state, symbol) => { if (state === 'dead') return 'dead'; const parts = state.split(':'); if (parts[0] === 'pre') { if (symbol === '#') return `post:${parts[1]}:0`; return `pre:${symbol === '1' ? 1 - Number(parts[1]) : parts[1]}`; } if (symbol === '#') return 'dead'; return `post:${parts[1]}:${symbol === '1' ? 1 - Number(parts[2]) : parts[2]}`; },
-  },
-  {
-    id: 9, title: 'Première lettre inédite après #', prompt: 'Ensemble des mots tels que $\\#$ apparaît exactement une fois, est suivi d’au moins un bit, et que le premier bit après $\\#$ n’apparaît pas avant lui.', alphabet: ['0', '1', '#'],
-    accepted: ['#0', '#101', '0#1', '000#1'], rejected: ['#', '0#0', '01#0', '0#1#'], initial: 'pre:0',
-    isFinal: (state) => state === 'ok', transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'ok') return symbol === '#' ? 'dead' : 'ok'; const [side, rawMask] = state.split(':'); const mask = Number(rawMask); if (side === 'pre') { if (symbol === '#') return `need:${mask}`; return `pre:${mask | (symbol === '0' ? 1 : 2)}`; } if (symbol === '#') return 'dead'; const bit = symbol === '0' ? 1 : 2; return mask & bit ? 'dead' : 'ok'; },
-  },
-  {
-    id: 10, title: 'Multiples de trois en binaire', prompt: 'Ensemble des mots non vides tels que leur valeur binaire est divisible par $3$ ; les zéros initiaux sont autorisés.', alphabet: ['0', '1'],
-    accepted: ['0', '11', '110', '1001'], rejected: ['', '1', '10', '101'], initial: 'start',
-    isFinal: (state) => state === 'r0', transition: (state, symbol) => { const remainder = state === 'start' ? 0 : Number(state[1]); return `r${(remainder * 2 + Number(symbol)) % 3}`; },
-  },
-  {
-    id: 11, title: 'Trois parités synchronisées', prompt: 'Ensemble des mots tels que les nombres de $a$, de $b$ et de $c$ ont tous la même parité.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'abc', 'aabbcc', 'abccba'], rejected: ['a', 'ab', 'abbc'], initial: '000',
-    isFinal: (state) => state === '000' || state === '111', transition: (state, symbol) => { const index = ['a', 'b', 'c'].indexOf(symbol); return state.split('').map((bit, position) => position === index ? String(1 - Number(bit)) : bit).join(''); },
-  },
-  {
-    id: 12, title: 'Double modulo cinq', prompt: 'Ensemble des mots tels que le nombre de $a$ est congru au double du nombre de $b$ modulo $5$ ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'c', 'aab', 'bbbbb', 'aaaaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
-    isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : symbol === 'b' ? 3 : 0)) % 5),
-  },
-];
-
-const languageRegexExercises: LanguageExerciseDefinition[] = [
-  {
-    id: 1, title: 'Une seule occurrence de ab', prompt: 'Ensemble des mots tels que le facteur $ab$ apparaît exactement une fois.', alphabet: alphabetAB,
-    accepted: ['ab', 'aab', 'abba', 'baba'], rejected: ['', 'a', 'bb', 'abab'], initial: '0:0',
-    isFinal: (state) => state.startsWith('1:'),
-    transition: (state, symbol) => { const [count, lastA] = state.split(':').map(Number); return `${Math.min(2, count + (lastA && symbol === 'b' ? 1 : 0))}:${symbol === 'a' ? 1 : 0}`; },
-  },
-  {
-    id: 2, title: 'Un c toutes les trois lettres', prompt: 'Ensemble des mots tels que chaque lettre dont la position est un multiple de $3$ est un $c$ ; les positions commencent à $1$.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'a', 'cc', 'aac', 'abcaac'], rejected: ['aaa', 'abb', 'abcaba'], initial: '0',
-    isFinal: (state) => state !== 'dead',
-    transition: (state, symbol) => state === 'dead' || (state === '2' && symbol !== 'c') ? 'dead' : String((Number(state) + 1) % 3),
-  },
-  {
-    id: 3, title: 'Termine par 0 sans 111', prompt: 'Ensemble des mots tels que le dernier symbole est $0$ et que le facteur $111$ n’apparaît pas.', alphabet: ['0', '1'],
-    accepted: ['0', '10', '110', '1010'], rejected: ['', '1', '1110', '1101'], initial: 'start',
-    isFinal: (state) => state === 'zero',
-    transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (symbol === '0') return 'zero'; if (state === 'one2') return 'dead'; return state === 'one1' ? 'one2' : 'one1'; },
-  },
-  {
-    id: 4, title: 'Lettres à compléter', prompt: 'Ensemble des mots tels que chaque $b$ est immédiatement suivi d’un $a$, et chaque $c$ immédiatement suivi de $ba$.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'a', 'ba', 'cba', 'bacba'], rejected: ['b', 'cb', 'caa', 'bb'], initial: 'ready',
-    isFinal: (state) => state === 'ready',
-    transition: (state, symbol) => { if (state === 'ready') return symbol === 'a' ? 'ready' : symbol === 'b' ? 'need-a' : 'need-b'; if (state === 'need-b') return symbol === 'b' ? 'need-a' : 'dead'; if (state === 'need-a') return symbol === 'a' ? 'ready' : 'dead'; return 'dead'; },
-  },
-  {
-    id: 5, title: 'Deux séparateurs espacés', prompt: 'Ensemble des mots tels que $\\#$ apparaît exactement deux fois, avec au moins un bit entre les deux occurrences.', alphabet: ['0', '1', '#'],
-    accepted: ['#0#', '1#1#0', '#01#11'], rejected: ['', '##', '#0', '#0#1#'], initial: 'before',
-    isFinal: (state) => state === 'after',
-    transition: (state, symbol) => { if (state === 'before') return symbol === '#' ? 'gap-empty' : 'before'; if (state === 'gap-empty') return symbol === '#' ? 'dead' : 'gap'; if (state === 'gap') return symbol === '#' ? 'after' : 'gap'; if (state === 'after') return symbol === '#' ? 'dead' : 'after'; return 'dead'; },
-  },
-  {
-    id: 6, title: 'Écart impair entre les b', prompt: 'Ensemble des mots tels qu’entre deux $b$ consécutifs, le nombre de $a$ est toujours impair.', alphabet: alphabetAB,
-    accepted: ['', 'b', 'aba', 'bab', 'baaab'], rejected: ['bb', 'baab', 'bababb'], initial: 'none',
-    isFinal: (state) => state !== 'dead',
-    transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'none') return symbol === 'b' ? 'even' : 'none'; if (symbol === 'a') return state === 'even' ? 'odd' : 'even'; return state === 'odd' ? 'even' : 'dead'; },
-  },
-  {
-    id: 7, title: 'Deux parités de blocs', prompt: 'Ensemble des mots tels que chaque bloc maximal de $a$ est de longueur paire et chaque bloc maximal de $b$ de longueur impaire.', alphabet: alphabetAB,
-    accepted: ['', 'aa', 'b', 'aabbb', 'baab'], rejected: ['a', 'bb', 'abb', 'aabb'], initial: 'start',
-    isFinal: (state) => state === 'start' || state === 'a-even' || state === 'b-odd',
-    transition: (state, symbol) => { if (state === 'dead') return 'dead'; if (state === 'start') return symbol === 'a' ? 'a-odd' : 'b-odd'; if (state === 'a-odd') return symbol === 'a' ? 'a-even' : 'dead'; if (state === 'a-even') return symbol === 'a' ? 'a-odd' : 'b-odd'; if (state === 'b-odd') return symbol === 'b' ? 'b-even' : 'a-odd'; return symbol === 'b' ? 'b-odd' : 'dead'; },
-  },
-  {
-    id: 8, title: 'Alphabet autorisé après #', prompt: 'Ensemble des mots tels que $\\#$ apparaît exactement une fois et qu’après lui, seules des lettres déjà apparues avant lui sont utilisées.', alphabet: ['0', '1', '#'],
-    accepted: ['#', '0#', '01#100', '10#111'], rejected: ['', '#0', '0#1', '0#0#'], initial: 'pre:0',
-    isFinal: (state) => state.startsWith('post:'),
-    transition: (state, symbol) => { if (state === 'dead') return 'dead'; const [side, rawMask] = state.split(':'); const mask = Number(rawMask); if (side === 'pre') { if (symbol === '#') return `post:${mask}`; return `pre:${mask | (symbol === '0' ? 1 : 2)}`; } if (symbol === '#') return 'dead'; const bit = symbol === '0' ? 1 : 2; return mask & bit ? state : 'dead'; },
-  },
-  {
-    id: 9, title: 'Deux compteurs indépendants', prompt: 'Ensemble des mots tels que le nombre de $a$ est multiple de $3$ et le nombre de $b$ est pair ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'ccc', 'aaa', 'bb', 'aaabbc'], rejected: ['a', 'b', 'ab', 'aaab'], initial: '0:0',
-    isFinal: (state) => state === '0:0',
-    transition: (state, symbol) => { const [a, b] = state.split(':').map(Number); return symbol === 'a' ? `${(a + 1) % 3}:${b}` : symbol === 'b' ? `${a}:${1 - b}` : state; },
-  },
-  {
-    id: 10, title: 'Congruence croisée modulo cinq', prompt: 'Ensemble des mots tels que le nombre de $a$ est congru au double du nombre de $b$ modulo $5$ ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'c', 'aab', 'bbbbb', 'aaaaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
-    isFinal: (state) => state === '0',
-    transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : symbol === 'b' ? 3 : 0)) % 5),
-  },
-];
-
-const exerciseNode = (id: string, x: number, y: number, initial = false, final = false): StateNode => ({
-  id,
-  type: 'state',
-  position: { x, y },
-  data: { label: id.slice(1), initial, final },
-});
-const exerciseEdge = (id: string, source: string, target: string, label: string): Edge => ({ id, source, target, label, type: 'automaton' });
-
-const regexExercises: RegexExerciseDefinition[] = [
-  {
-    id: 1, title: 'Automate 1', prompt: '', alphabet: alphabetAB,
-    accepted: ['b', 'ab', 'baa'], rejected: ['', 'a', 'bb', 'bab'], answer: 'a*ba*',
-    nodes: [exerciseNode('q0', 190, 220, true), exerciseNode('q1', 500, 220, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', 'a'), exerciseEdge('e1', 'q0', 'q1', 'b'), exerciseEdge('e2', 'q1', 'q1', 'a')],
-  },
-  {
-    id: 2, title: 'Automate 2', prompt: '', alphabet: alphabetAB,
-    accepted: ['', 'b', 'ab', 'babb'], rejected: ['a', 'aa', 'ba'], answer: '(b|ab)*',
-    nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', 'b'), exerciseEdge('e1', 'q0', 'q1', 'a'), exerciseEdge('e2', 'q1', 'q0', 'b')],
-  },
-  {
-    id: 3, title: 'Automate 3', prompt: '', alphabet: alphabetAB,
-    accepted: ['', 'a', 'b', 'aa', 'ba', 'aaba'], rejected: ['ab', 'bb', 'babb'], answer: '((a|b)a)*(ε|a|b)',
-    nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q1', 'a, b'), exerciseEdge('e1', 'q1', 'q0', 'a')],
-  },
-  {
-    id: 4, title: 'Automate 4', prompt: '', alphabet: alphabetAB,
-    accepted: ['a', 'b', 'aa', 'aba', 'baab'], rejected: ['', 'ab', 'ba', 'abb'], answer: 'a((a|b)*a|ε)|b((a|b)*b|ε)',
-    nodes: [exerciseNode('q0', 60, 230, true), exerciseNode('q1', 300, 90, false, true), exerciseNode('q2', 570, 90), exerciseNode('q3', 300, 350, false, true), exerciseNode('q4', 570, 350)],
-    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q0', 'q3', 'b'), exerciseEdge('e2', 'q1', 'q1', 'a'), exerciseEdge('e3', 'q1', 'q2', 'b'), exerciseEdge('e4', 'q2', 'q1', 'a'), exerciseEdge('e5', 'q2', 'q2', 'b'), exerciseEdge('e6', 'q3', 'q3', 'b'), exerciseEdge('e7', 'q3', 'q4', 'a'), exerciseEdge('e8', 'q4', 'q3', 'b'), exerciseEdge('e9', 'q4', 'q4', 'a')],
-  },
-  {
-    id: 5, title: 'Automate 5', prompt: '', alphabet: ['0', '1'],
-    accepted: ['', '0', '11', '01100', '11011'], rejected: ['1', '10', '111', '101'], answer: '(0|11)*',
-    nodes: [exerciseNode('q0', 190, 220, true, true), exerciseNode('q1', 500, 220)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', '0'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q0', '1')],
-  },
-  {
-    id: 6, title: 'Automate 6', prompt: '', alphabet: alphabetAB,
-    accepted: ['', 'a', 'b', 'ab', 'baba'], rejected: ['aa', 'bb', 'abb'], answer: '(ab)*(ε|a)|(ba)*(ε|b)',
-    nodes: [exerciseNode('q0', 120, 220, true, true), exerciseNode('q1', 470, 100, false, true), exerciseNode('q2', 470, 340, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q0', 'q2', 'b'), exerciseEdge('e2', 'q1', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q1', 'a')],
-  },
-  {
-    id: 7, title: 'Automate 7', prompt: '', alphabet: ['0', '1'],
-    accepted: ['100', '101', '1110'], rejected: ['', '10', '010', '1000'], answer: '(0|1)*1(0|1)(0|1)',
-    nodes: [exerciseNode('q0', 60, 220, true), exerciseNode('q1', 280, 220), exerciseNode('q2', 500, 220), exerciseNode('q3', 720, 220, false, true)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', '0, 1'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q2', '0, 1'), exerciseEdge('e3', 'q2', 'q3', '0, 1')],
-  },
-  {
-    id: 8, title: 'Automate 8', prompt: '', alphabet: alphabetAB,
-    accepted: ['', 'aa', 'bb', 'abba', 'abab'], rejected: ['a', 'b', 'ab', 'aab'], answer: '(aa|bb|(ab|ba)(aa|bb)*(ab|ba))*',
-    nodes: [exerciseNode('q0', 180, 100, true, true), exerciseNode('q1', 500, 100), exerciseNode('q2', 180, 350), exerciseNode('q3', 500, 350)],
-    edges: [exerciseEdge('e0', 'q0', 'q1', 'a'), exerciseEdge('e1', 'q1', 'q0', 'a'), exerciseEdge('e2', 'q0', 'q2', 'b'), exerciseEdge('e3', 'q2', 'q0', 'b'), exerciseEdge('e4', 'q1', 'q3', 'b'), exerciseEdge('e5', 'q3', 'q1', 'b'), exerciseEdge('e6', 'q2', 'q3', 'a'), exerciseEdge('e7', 'q3', 'q2', 'a')],
-  },
-  {
-    id: 9, title: 'Automate 9', prompt: '', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'bbb', 'aaa', 'abacac'], rejected: ['a', 'aa', 'abca'], answer: '(b|c)*(a(b|c)*a(b|c)*a(b|c)*)*',
-    nodes: [exerciseNode('q0', 110, 220, true, true), exerciseNode('q1', 360, 100), exerciseNode('q2', 610, 220)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', 'b, c'), exerciseEdge('e1', 'q1', 'q1', 'b, c'), exerciseEdge('e2', 'q2', 'q2', 'b, c'), exerciseEdge('e3', 'q0', 'q1', 'a'), exerciseEdge('e4', 'q1', 'q2', 'a'), exerciseEdge('e5', 'q2', 'q0', 'a')],
-  },
-  {
-    id: 10, title: 'Automate 10', prompt: '', alphabet: ['0', '1'],
-    accepted: ['', '0', '11', '110', '1001'], rejected: ['1', '10', '101', '111'], answer: '(0|1(01*0)*1)*',
-    nodes: [exerciseNode('q0', 120, 220, true, true), exerciseNode('q1', 440, 90), exerciseNode('q2', 440, 350)],
-    edges: [exerciseEdge('e0', 'q0', 'q0', '0'), exerciseEdge('e1', 'q0', 'q1', '1'), exerciseEdge('e2', 'q1', 'q2', '0'), exerciseEdge('e3', 'q1', 'q0', '1'), exerciseEdge('e4', 'q2', 'q1', '0'), exerciseEdge('e5', 'q2', 'q2', '1')],
-  },
-];
 
 function compareLanguage(nodes: StateNode[], edges: Edge[], exercise: LanguageExerciseDefinition) {
   const initialStates = nodes.filter((node) => node.data.initial).map((node) => node.id).sort();
