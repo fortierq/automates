@@ -58,9 +58,9 @@ export const languageRegexExercises: LanguageExerciseDefinition[] = [
     transition: (state, symbol) => { const [a, b] = state.split(':').map(Number); return symbol === 'a' ? `${(a + 1) % 3}:${b}` : symbol === 'b' ? `${a}:${1 - b}` : state; },
   },
   {
-    id: 10, title: 'Congruence croisée modulo cinq', prompt: 'Ensemble des mots tels que le nombre de $a$ est congru au double du nombre de $b$ modulo $5$ ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'c', 'aab', 'bbbbb', 'aaaaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
+    id: 10, title: 'Congruence croisée modulo trois', prompt: 'Ensemble des mots tels que le nombre de $a$ est congru au double du nombre de $b$ modulo $3$ ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'c', 'aab', 'bbb', 'aaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
     isFinal: (state) => state === '0',
-    transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : symbol === 'b' ? 3 : 0)) % 5),
+    transition: (state, symbol) => String((Number(state) + (symbol === 'c' ? 0 : 1)) % 3),
   },
 ];

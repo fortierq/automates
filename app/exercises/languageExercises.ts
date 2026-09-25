@@ -24,9 +24,9 @@ export const languageExercises: LanguageExerciseDefinition[] = [
     isFinal: (state) => state !== 'dead', transition: (state, symbol) => { if (state === 'dead' || state === symbol.repeat(2)) return 'dead'; return state.endsWith(symbol) ? symbol.repeat(2) : symbol; },
   },
   {
-    id: 5, title: 'Troisième bit depuis la fin', prompt: 'Ensemble des mots tels que le troisième bit en partant de la fin est $1$.', alphabet: ['0', '1'],
-    accepted: ['100', '101', '1110', '01101'], rejected: ['', '10', '010', '1000'], initial: '',
-    isFinal: (state) => state.length >= 3 && state.at(-3) === '1', transition: (state, symbol) => (state + symbol).slice(-3),
+    id: 5, title: 'Deuxième bit depuis la fin', prompt: 'Ensemble des mots tels que le deuxième bit en partant de la fin est $1$.', alphabet: ['0', '1'],
+    accepted: ['10', '11', '010', '1110'], rejected: ['', '1', '00', '101'], initial: '',
+    isFinal: (state) => state.length >= 2 && state.at(-2) === '1', transition: (state, symbol) => (state + symbol).slice(-2),
   },
   {
     id: 6, title: 'Un seul des deux facteurs', prompt: 'Ensemble des mots contenant au moins une fois le facteur $aba$ ou au moins une fois le facteur $bab$, mais pas les deux.', alphabet: alphabetAB,
@@ -59,8 +59,8 @@ export const languageExercises: LanguageExerciseDefinition[] = [
     isFinal: (state) => state === '000' || state === '111', transition: (state, symbol) => { const index = ['a', 'b', 'c'].indexOf(symbol); return state.split('').map((bit, position) => position === index ? String(1 - Number(bit)) : bit).join(''); },
   },
   {
-    id: 12, title: 'Double modulo cinq', prompt: 'Ensemble des mots tels que le nombre de $a$ est congru au double du nombre de $b$ modulo $5$ ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
-    accepted: ['', 'c', 'aab', 'bbbbb', 'aaaaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
-    isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'a' ? 1 : symbol === 'b' ? 3 : 0)) % 5),
+    id: 12, title: 'Double modulo trois', prompt: 'Ensemble des mots tels que le nombre de $a$ est congru au double du nombre de $b$ modulo $3$ ; la lettre $c$ est neutre.', alphabet: ['a', 'b', 'c'],
+    accepted: ['', 'c', 'aab', 'bbb', 'aaaccc'], rejected: ['a', 'b', 'ab', 'aabb'], initial: '0',
+    isFinal: (state) => state === '0', transition: (state, symbol) => String((Number(state) + (symbol === 'c' ? 0 : 1)) % 3),
   },
 ];
