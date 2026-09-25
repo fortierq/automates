@@ -29,7 +29,7 @@ export const languageExercises: LanguageExerciseDefinition[] = [
     isFinal: (state) => state.length >= 3 && state.at(-3) === '1', transition: (state, symbol) => (state + symbol).slice(-3),
   },
   {
-    id: 6, title: 'Un seul des deux facteurs', prompt: 'Ensemble des mots tels qu’exactement l’un des facteurs $aba$ et $bab$ apparaît.', alphabet: alphabetAB,
+    id: 6, title: 'Un seul des deux facteurs', prompt: 'Ensemble des mots contenant au moins une fois le facteur $aba$ ou au moins une fois le facteur $bab$, mais pas les deux.', alphabet: alphabetAB,
     accepted: ['aba', 'bab', 'aabaa', 'bbabb'], rejected: ['', 'abba', 'abab', 'baba'], initial: '0|',
     isFinal: (state) => state.startsWith('1|') || state.startsWith('2|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; },
   },
