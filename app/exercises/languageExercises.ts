@@ -29,9 +29,9 @@ export const languageExercises: LanguageExerciseDefinition[] = [
     isFinal: (state) => state.length >= 2 && state.at(-2) === '1', transition: (state, symbol) => (state + symbol).slice(-2),
   },
   {
-    id: 6, title: 'Contient le facteur aba', prompt: 'Ensemble des mots contenant au moins une fois le facteur $aba$.', alphabet: alphabetAB,
-    accepted: ['aba', 'aaba', 'baba', 'abaa'], rejected: ['', 'a', 'bb', 'abb'], initial: '',
-    isFinal: (state) => state === 'found', transition: (state, symbol) => { if (state === 'found') return state; const word = state + symbol; return word.endsWith('aba') ? 'found' : word.endsWith('ab') ? 'ab' : word.endsWith('a') ? 'a' : ''; },
+    id: 6, title: 'Un seul des deux facteurs', prompt: 'Ensemble des mots contenant au moins une fois le facteur $aba$ ou au moins une fois le facteur $bab$, mais pas les deux.', alphabet: alphabetAB,
+    accepted: ['aba', 'bab', 'aabaa', 'bbabb'], rejected: ['', 'abba', 'abab', 'baba'], initial: '0|',
+    isFinal: (state) => state.startsWith('1|') || state.startsWith('2|'), transition: (state, symbol) => { const [rawMask, suffix] = state.split('|'); const word = suffix + symbol; const mask = Number(rawMask) | (word.endsWith('aba') ? 1 : 0) | (word.endsWith('bab') ? 2 : 0); return `${mask}|${word.slice(-2)}`; },
   },
   {
     id: 7, title: 'Lettres c assorties', prompt: 'Ensemble des mots tels que chaque $c$ est immédiatement précédé et suivi de la même lettre : $aca$ ou $bcb$.', alphabet: ['a', 'b', 'c'],
